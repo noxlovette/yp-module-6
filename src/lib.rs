@@ -9,7 +9,8 @@ pub const READ_MODE_ERRORS: u8 = 1;
 /// Режим чтения из логов только операций, касающихся деген
 pub const READ_MODE_EXCHANGES: u8 = 2;
 
-/// Обёртка, без которой не выполнено требование `std::io::BufReader<T: std::io::Read>`
+/// Обёртка, без которой не выполнено требование `std::io::BufReader<T:
+/// std::io::Read>`
 #[derive(Debug)]
 struct RefMutWrapper<'a, T>(std::cell::RefMut<'a, T>);
 impl<'a, T> std::io::Read for RefMutWrapper<'a, T>
@@ -23,7 +24,8 @@ where
 
 /// Для `Box<dyn много трейтов, помимо auto-трейтов>`, (`rustc E0225`)
 /// `only auto traits can be used as additional traits in a trait object`
-/// `consider creating a new trait with all of these as supertraits and using that trait here instead`
+/// `consider creating a new trait with all of these as supertraits and using
+/// that trait here instead`
 pub trait MyReader: std::io::Read + std::fmt::Debug + 'static {}
 impl<T: std::io::Read + std::fmt::Debug + 'static> MyReader for T {}
 // подсказка: вместо trait-объекта можно дженерик
@@ -31,7 +33,9 @@ impl<T: std::io::Read + std::fmt::Debug + 'static> MyReader for T {}
 #[derive(Debug)]
 struct LogIterator {
     lines: std::iter::Filter<
-        std::io::Lines<std::io::BufReader<RefMutWrapper<'static, Box<dyn MyReader>>>>,
+        std::io::Lines<
+            std::io::BufReader<RefMutWrapper<'static, Box<dyn MyReader>>>,
+        >,
         fn(&Result<String, std::io::Error>) -> bool,
     >,
     reader_rc: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>>,
@@ -49,24 +53,29 @@ impl LogIterator {
         let the_borrow = r.borrow_mut();
         let the_borrow = unsafe { std::mem::transmute::<_, _>(the_borrow) };
         Self {
-            lines: std::io::BufReader::with_capacity(4096, RefMutWrapper(the_borrow))
-                .lines()
-                .filter(|line_res| {
-                    !line_res
-                        .as_ref()
-                        .ok()
-                        .map(|line| line.trim().is_empty())
-                        .unwrap_or(false)
-                }),
+            lines: std::io::BufReader::with_capacity(
+                4096,
+                RefMutWrapper(the_borrow),
+            )
+            .lines()
+            .filter(|line_res| {
+                !line_res
+                    .as_ref()
+                    .ok()
+                    .map(|line| line.trim().is_empty())
+                    .unwrap_or(false)
+            }),
             reader_rc: r,
         }
     }
 }
 impl Iterator for LogIterator {
     type Item = parse::LogLine;
+
     fn next(&mut self) -> Option<Self::Item> {
         let line = self.lines.next()?.ok()?;
-        let (remaining, result) = LOG_LINE_PARSER.parse(line.trim().to_string()).ok()?;
+        let (remaining, result) =
+            LOG_LINE_PARSER.parse(line.trim().to_string()).ok()?;
         remaining.trim().is_empty().then_some(result)
     }
 }
@@ -82,7 +91,8 @@ pub fn read_log(
     let mut collected = Vec::new();
     // подсказка: можно обойтись итераторами
     for log in logs {
-        if request_ids.is_empty() || {
+        if request_ids.is_empty()
+            || {
             let mut request_id_found = false;
             for request_id in &request_ids {
                 if *request_id == log.request_id {
@@ -132,7 +142,8 @@ pub fn read_log(
 mod test {
     use super::*;
 
-    const SOURCE1: &'static str = r#"System::Error NetworkError "url unknown" requestid=1"#;
+    const SOURCE1: &'static str =
+        r#"System::Error NetworkError "url unknown" requestid=1"#;
 
     const SOURCE: &'static str = r#"
 System::Error NetworkError "network interface is down" requestid=1
@@ -201,17 +212,22 @@ App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"m
     #[test]
     fn test_all() {
         let refcell1: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Box::new(SOURCE1.as_bytes())));
+            std::rc::Rc::new(std::cell::RefCell::new(Box::new(
+                SOURCE1.as_bytes(),
+            )));
         assert_eq!(read_log(refcell1.clone(), READ_MODE_ALL, vec![]).len(), 1);
         let refcell: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Box::new(SOURCE.as_bytes())));
+            std::rc::Rc::new(std::cell::RefCell::new(Box::new(
+                SOURCE.as_bytes(),
+            )));
         let all_parsed = read_log(refcell.clone(), READ_MODE_ALL, vec![]);
         println!("all parsed:");
         all_parsed
             .iter()
             .for_each(|parsed| println!("  {:?}", parsed));
-        // 2 для начала и конца строки (чтобы первая и последняя кавычки на отдельных строках были)
-        // второе число - число пустых строк, которые оставлены для удобства чтения
+        // 2 для начала и конца строки (чтобы первая и последняя кавычки на
+        // отдельных строках были) второе число - число пустых строк,
+        // которые оставлены для удобства чтения
         assert_eq!(all_parsed.len(), SOURCE.lines().count() - 2 - 7);
     }
 }
