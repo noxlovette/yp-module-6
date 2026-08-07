@@ -1,5 +1,8 @@
 use crate::{
-    bucket::Bucket,
+    domain::{
+        AUTHDATA_SIZE, Announcements, AuthData, Bucket, UserBucket,
+        UserBuckets, UserCash,
+    },
     log::{
         AppLogErrorKind, AppLogJournalKind, AppLogKind, AppLogTraceKind,
         LogKind, LogLine, SystemLogErrorKind, SystemLogKind,
@@ -809,31 +812,24 @@ impl<T: Parser> Parser for Take<T> {
         Ok((remaining, result))
     }
 }
-/// Конструктор `Take`
-fn take<T: Parser>(count: usize, parser: T) -> Take<T> {
-    Take { count, parser }
+/// Конструкция 'либо-либо'
+enum Either<Left, Right> {
+    Left(Left),
+    Right(Right),
 }
 
-const AUTHDATA_SIZE: usize = 1024;
-
-// подсказка: довольно много места на стэке
-/// Данные для авторизации
-#[derive(Debug, Clone, PartialEq)]
-pub struct AuthData([u8; AUTHDATA_SIZE]);
 impl Parsable for AuthData {
     type Parser = Map<Take<stdp::Byte>, fn(Vec<u8>) -> Self>;
 
     fn parser() -> Self::Parser {
         map(take(AUTHDATA_SIZE, stdp::Byte), |authdata| {
-            AuthData(authdata.try_into().unwrap_or([0; AUTHDATA_SIZE]))
+            AuthData::new(authdata.try_into().unwrap_or([0; AUTHDATA_SIZE]))
         })
     }
 }
-
-/// Конструкция 'либо-либо'
-enum Either<Left, Right> {
-    Left(Left),
-    Right(Right),
+/// Конструктор `Take`
+fn take<T: Parser>(count: usize, parser: T) -> Take<T> {
+    Take { count, parser }
 }
 
 /// Статус, которые можно парсить
@@ -920,16 +916,11 @@ impl Parsable for Bucket {
                 ),
                 strip_whitespace(tag("}")),
             ),
-            |(asset_id, count)| Bucket { asset_id, count },
+            |(asset_id, count)| Bucket::new(asset_id, count),
         )
     }
 }
-/// Фиатные деньги конкретного пользователя
-#[derive(Debug, Clone, PartialEq)]
-pub struct UserCash {
-    pub user_id: String,
-    pub count: u32,
-}
+
 impl Parsable for UserCash {
     type Parser = Map<
         Delimited<
@@ -958,13 +949,6 @@ impl Parsable for UserCash {
     }
 }
 
-/// [Bucket] конкретного пользователя
-#[derive(Debug, Clone, PartialEq)]
-pub struct UserBucket {
-    pub user_id: String,
-    pub bucket: Bucket,
-}
-
 impl Parsable for UserBucket {
     type Parser = Map<
         Delimited<
@@ -991,15 +975,9 @@ impl Parsable for UserBucket {
                 ),
                 strip_whitespace(tag("}")),
             ),
-            |(user_id, bucket)| UserBucket { user_id, bucket },
+            |(user_id, bucket)| UserBucket::new(user_id, bucket),
         )
     }
-}
-/// [Бакеты](Bucket) конкретного пользователя
-#[derive(Debug, Clone, PartialEq)]
-pub struct UserBuckets {
-    pub user_id: String,
-    pub buckets: Vec<Bucket>,
 }
 impl Parsable for UserBuckets {
     type Parser = Map<
@@ -1031,10 +1009,6 @@ impl Parsable for UserBuckets {
         )
     }
 }
-/// Список опубликованных бакетов
-#[derive(Debug, Clone, PartialEq)]
-pub struct Announcements(Vec<UserBuckets>);
-
 impl Parsable for Announcements {
     type Parser = Map<
         List<<UserBuckets as Parsable>::Parser>,
@@ -1043,7 +1017,7 @@ impl Parsable for Announcements {
 
     fn parser() -> Self::Parser {
         fn from_vec(vec: Vec<UserBuckets>) -> Announcements {
-            Announcements(vec)
+            vec.into()
         }
         map(list(UserBuckets::parser()), from_vec)
     }
@@ -1774,7 +1748,7 @@ mod test {
     }
 
     #[test]
-    fn test_Bucket() {
+    fn test_bucket() {
         assert_eq!(
             Bucket::parser()
                 .parse(r#"Bucket{"asset_id":"usd","count":42,}"#.into()),

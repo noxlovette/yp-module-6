@@ -1,3 +1,5 @@
+use crate::domain::{Announcements, AuthData, UserBucket, UserCash};
+
 /// Строка логов, [лог](AppLogKind) с `request_id`
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogLine {
