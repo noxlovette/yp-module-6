@@ -109,11 +109,52 @@ pub struct UserBuckets {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserCash {
     user_id: UserId,
-    count: NonZeroU32,
+    count: Capital,
 }
+
+/// Капитал, не меньше 10usd
+#[derive(Debug, Clone, PartialEq)]
+pub struct Capital(NonZeroU32);
+
+impl Capital {
+    pub const MIN: u32 = 10;
+
+    pub fn new(count: NonZeroU32) -> Result<Self, ParsingError> {
+        if count.get() < Self::MIN {
+            Err(ParsingError::CapitalTooLow)
+        } else {
+            Ok(Self(count))
+        }
+    }
+
+    pub fn get(&self) -> u32 {
+        self.0.get()
+    }
+}
+
 impl UserCash {
-    pub fn new(user_id: UserId, count: NonZeroU32) -> Self {
+    pub fn new(user_id: UserId, count: Capital) -> Self {
         Self { user_id, count }
+    }
+}
+
+/// Ликвидность актива, не меньше 50usd
+#[derive(Debug, Clone, PartialEq)]
+pub struct Liquidity(NonZeroU32);
+
+impl Liquidity {
+    pub const MIN: u32 = 50;
+
+    pub fn new(count: NonZeroU32) -> Result<Self, ParsingError> {
+        if count.get() < Self::MIN {
+            Err(ParsingError::LiquidityTooLow)
+        } else {
+            Ok(Self(count))
+        }
+    }
+
+    pub fn get(&self) -> u32 {
+        self.0.get()
     }
 }
 

@@ -29,4 +29,8 @@ pub enum ParsingError {
     ParseListError,
     #[error("Line parsed successfully but left unconsumed trailing input")]
     TrailingInput,
+    #[error("Capital must be at least {} usd", crate::domain::Capital::MIN)]
+    CapitalTooLow,
+    #[error("Liquidity must be at least {} usd", crate::domain::Liquidity::MIN)]
+    LiquidityTooLow,
 }

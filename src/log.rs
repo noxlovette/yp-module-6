@@ -1,7 +1,8 @@
 use std::num::NonZeroU32;
 
 use crate::domain::{
-    Announcements, AssetIdentifier, AuthData, UserBucket, UserCash, UserId,
+    Announcements, AssetIdentifier, AuthData, Liquidity, UserBucket, UserCash,
+    UserId,
 };
 
 /// Строка логов, [лог](AppLogKind) с `request_id`
@@ -91,11 +92,10 @@ pub enum AppLogErrorKind {
     LackOf(String),
     SystemError(String),
 }
-// подсказка: а поля не слишком много места на стэке занимают?
 /// Trace [приложения](AppLogKind)
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppLogTraceKind {
-    Connect(AuthData),
+    Connect(Box<AuthData>),
     SendRequest(String),
     Check(Announcements),
     GetResponse(String),
@@ -113,7 +113,7 @@ pub enum AppLogJournalKind {
     RegisterAsset {
         asset_id: AssetIdentifier,
         user_id: UserId,
-        liquidity: NonZeroU32,
+        liquidity: Liquidity,
     },
     UnregisterAsset {
         asset_id: AssetIdentifier,

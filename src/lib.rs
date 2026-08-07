@@ -1,7 +1,3 @@
-//! Крейт для чтения логов
-
-#![warn(missing_docs)]
-
 pub mod domain;
 mod error;
 pub mod log;
@@ -63,7 +59,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let line = self.0.next()?.ok()?;
         Some(
-            LOG_LINE_PARSER
+            LogLine::parser()
                 .parse(line.trim())
                 .map_err(Error::from)
                 .and_then(|(remaining, result)| {
