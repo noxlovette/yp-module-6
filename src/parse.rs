@@ -482,103 +482,51 @@ where
 pub struct All<T> {
     parser: T,
 }
-impl<'a, A0, A1> Parser<'a> for All<(A0, A1)>
-where
-    A0: Parser<'a>,
-    A1: Parser<'a>,
-{
-    type Dest = (A0::Dest, A1::Dest);
+/// Генерирует `impl Parser for All<(A0, ..., An)>` для заданного списка
+/// `тип имя_переменной индекс_в_кортеже`, чтобы не дублировать одну и ту же
+/// реализацию под каждое количество элементов
+macro_rules! impl_all {
+    ($( $ty:ident $var:ident $idx:tt ),+ $(,)?) => {
+        impl<'a, $($ty),+> Parser<'a> for All<($($ty,)+)>
+        where
+            $($ty: Parser<'a>,)+
+        {
+            type Dest = ($($ty::Dest,)+);
 
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        let (remaining, a0) = self.parser.0.parse(input)?;
-        self.parser
-            .1
-            .parse(remaining)
-            .map(|(remaining, a1)| (remaining, (a0, a1)))
-    }
+            fn parse(
+                &self,
+                input: &'a str,
+            ) -> Result<(&'a str, Self::Dest), ParsingError> {
+                let mut remaining = input;
+                $(
+                    let (next_remaining, $var) =
+                        self.parser.$idx.parse(remaining)?;
+                    remaining = next_remaining;
+                )+
+                Ok((remaining, ($($var,)+)))
+            }
+        }
+    };
 }
-/// Конструктор [All] для двух парсеров
-fn all2<A0: for<'a> Parser<'a>, A1: for<'a> Parser<'a>>(
-    a0: A0,
-    a1: A1,
-) -> All<(A0, A1)> {
-    All { parser: (a0, a1) }
+/// Генерирует конструктор [All] для заданного списка `тип аргумент`
+macro_rules! impl_all_ctor {
+    ($ctor:ident; $( $ty:ident $arg:ident ),+ $(,)?) => {
+        /// Конструктор [All]
+        fn $ctor<$($ty: for<'a> Parser<'a>),+>(
+            $($arg: $ty),+
+        ) -> All<($($ty,)+)> {
+            All {
+                parser: ($($arg,)+),
+            }
+        }
+    };
 }
-impl<'a, A0, A1, A2> Parser<'a> for All<(A0, A1, A2)>
-where
-    A0: Parser<'a>,
-    A1: Parser<'a>,
-    A2: Parser<'a>,
-{
-    type Dest = (A0::Dest, A1::Dest, A2::Dest);
-
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        let (remaining, a0) = self.parser.0.parse(input)?;
-        let (remaining, a1) = self.parser.1.parse(remaining)?;
-        self.parser
-            .2
-            .parse(remaining)
-            .map(|(remaining, a2)| (remaining, (a0, a1, a2)))
-    }
-}
-/// Конструктор [All] для трёх парсеров
-fn all3<
-    A0: for<'a> Parser<'a>,
-    A1: for<'a> Parser<'a>,
-    A2: for<'a> Parser<'a>,
->(
-    a0: A0,
-    a1: A1,
-    a2: A2,
-) -> All<(A0, A1, A2)> {
-    All {
-        parser: (a0, a1, a2),
-    }
-}
-impl<'a, A0, A1, A2, A3> Parser<'a> for All<(A0, A1, A2, A3)>
-where
-    A0: Parser<'a>,
-    A1: Parser<'a>,
-    A2: Parser<'a>,
-    A3: Parser<'a>,
-{
-    type Dest = (A0::Dest, A1::Dest, A2::Dest, A3::Dest);
-
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        let (remaining, a0) = self.parser.0.parse(input)?;
-        let (remaining, a1) = self.parser.1.parse(remaining)?;
-        let (remaining, a2) = self.parser.2.parse(remaining)?;
-        self.parser
-            .3
-            .parse(remaining)
-            .map(|(remaining, a3)| (remaining, (a0, a1, a2, a3)))
-    }
-}
-/// Конструктор [All] для четырёх парсеров
-fn all4<
-    A0: for<'a> Parser<'a>,
-    A1: for<'a> Parser<'a>,
-    A2: for<'a> Parser<'a>,
-    A3: for<'a> Parser<'a>,
->(
-    a0: A0,
-    a1: A1,
-    a2: A2,
-    a3: A3,
-) -> All<(A0, A1, A2, A3)> {
-    All {
-        parser: (a0, a1, a2, a3),
-    }
-}
+impl_all!(A0 a0 0, A1 a1 1);
+impl_all!(A0 a0 0, A1 a1 1, A2 a2 2);
+impl_all!(A0 a0 0, A1 a1 1, A2 a2 2, A3 a3 3);
+impl_all_ctor!(all2; A0 a0, A1 a1);
+impl_all_ctor!(all3; A0 a0, A1 a1, A2 a2);
+impl_all_ctor!(all4; A0 a0, A1 a1, A2 a2, A3 a3);
 /// Комбинатор, который вытаскивает значения из пары `"ключ":значение,`.
 /// Для простоты реализации, запятая всегда нужна в конце пары ключ-значение,
 /// простое '"ключ":значение' читаться не будет
@@ -627,122 +575,70 @@ fn key_value<T: for<'a> Parser<'a>>(
 pub struct Permutation<T> {
     parsers: T,
 }
-impl<'a, A0, A1> Parser<'a> for Permutation<(A0, A1)>
-where
-    A0: Parser<'a>,
-    A1: Parser<'a>,
-{
-    type Dest = (A0::Dest, A1::Dest);
+/// Генерирует `impl Parser for Permutation<(A0, ..., An)>` для заданного
+/// списка `тип слот индекс_в_кортеже`.
+///
+/// В отличие от рукописной версии (перебор всех перестановок, O(N!)), тут
+/// на каждом из N проходов пытаемся продвинуться любым ещё не заполненным
+/// парсером - O(N^2), и не нужно дублировать реализацию под каждое
+/// количество элементов
+macro_rules! impl_permutation {
+    ($rounds:expr; $( $ty:ident $slot:ident $idx:tt ),+ $(,)?) => {
+        impl<'a, $($ty),+> Parser<'a> for Permutation<($($ty,)+)>
+        where
+            $($ty: Parser<'a>,)+
+        {
+            type Dest = ($($ty::Dest,)+);
 
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        match self.parsers.0.parse(input) {
-            Ok((remaining, a0)) => self
-                .parsers
-                .1
-                .parse(remaining)
-                .map(|(remaining, a1)| (remaining, (a0, a1))),
-            Err(_) => {
-                self.parsers.1.parse(input).and_then(|(remaining, a1)| {
-                    self.parsers
-                        .0
-                        .parse(remaining)
-                        .map(|(remaining, a0)| (remaining, (a0, a1)))
-                })
+            fn parse(
+                &self,
+                input: &'a str,
+            ) -> Result<(&'a str, Self::Dest), ParsingError> {
+                $(let mut $slot: Option<$ty::Dest> = None;)+
+                let mut remaining = input;
+                let mut last_err = None;
+                for _ in 0..$rounds {
+                    let mut progressed = false;
+                    $(
+                        if !progressed && $slot.is_none() {
+                            match self.parsers.$idx.parse(remaining) {
+                                Ok((next_remaining, value)) => {
+                                    remaining = next_remaining;
+                                    $slot = Some(value);
+                                    progressed = true;
+                                }
+                                Err(e) => last_err = Some(e),
+                            }
+                        }
+                    )+
+                    if !progressed {
+                        return Err(
+                            last_err.unwrap_or(ParsingError::ParseTagError)
+                        );
+                    }
+                }
+                Ok((remaining, ($($slot.unwrap(),)+)))
             }
         }
-    }
+    };
 }
-/// Конструктор [Permutation] для двух парсеров
-fn permutation2<A0: for<'a> Parser<'a>, A1: for<'a> Parser<'a>>(
-    a0: A0,
-    a1: A1,
-) -> Permutation<(A0, A1)> {
-    Permutation { parsers: (a0, a1) }
-}
-impl<'a, A0, A1, A2> Parser<'a> for Permutation<(A0, A1, A2)>
-where
-    A0: Parser<'a>,
-    A1: Parser<'a>,
-    A2: Parser<'a>,
-{
-    type Dest = (A0::Dest, A1::Dest, A2::Dest);
-
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        match self.parsers.0.parse(input) {
-            Ok((remaining, a0)) => match self.parsers.1.parse(remaining) {
-                Ok((remaining, a1)) => self
-                    .parsers
-                    .2
-                    .parse(remaining)
-                    .map(|(remaining, a2)| (remaining, (a0, a1, a2))),
-                Err(_) => self.parsers.2.parse(remaining).and_then(
-                    |(remaining, a2)| {
-                        self.parsers
-                            .1
-                            .parse(remaining)
-                            .map(|(remaining, a1)| (remaining, (a0, a1, a2)))
-                    },
-                ),
-            },
-            Err(_) => match self.parsers.1.parse(input) {
-                Ok((remaining, a1)) => match self.parsers.0.parse(remaining) {
-                    Ok((remaining, a0)) => self
-                        .parsers
-                        .2
-                        .parse(remaining)
-                        .map(|(remaining, a2)| (remaining, (a0, a1, a2))),
-                    Err(_) => self.parsers.2.parse(remaining).and_then(
-                        |(remaining, a2)| {
-                            self.parsers.0.parse(remaining).map(
-                                |(remaining, a0)| (remaining, (a0, a1, a2)),
-                            )
-                        },
-                    ),
-                },
-                Err(_) => {
-                    self.parsers.2.parse(input).and_then(|(remaining, a2)| {
-                        match self.parsers.0.parse(remaining) {
-                            Ok((remaining, a0)) => {
-                                self.parsers.1.parse(remaining).map(
-                                    |(remaining, a1)| (remaining, (a0, a1, a2)),
-                                )
-                            }
-                            Err(_) => self.parsers.1.parse(remaining).and_then(
-                                |(remaining, a1)| {
-                                    self.parsers.0.parse(remaining).map(
-                                        |(remaining, a0)| {
-                                            (remaining, (a0, a1, a2))
-                                        },
-                                    )
-                                },
-                            ),
-                        }
-                    })
-                }
-            },
+/// Генерирует конструктор [Permutation] для заданного списка `тип аргумент`
+macro_rules! impl_permutation_ctor {
+    ($ctor:ident; $( $ty:ident $arg:ident ),+ $(,)?) => {
+        /// Конструктор [Permutation]
+        fn $ctor<$($ty: for<'a> Parser<'a>),+>(
+            $($arg: $ty),+
+        ) -> Permutation<($($ty,)+)> {
+            Permutation {
+                parsers: ($($arg,)+),
+            }
         }
-    }
+    };
 }
-/// Конструктор [Permutation] для трёх парсеров
-fn permutation3<
-    A0: for<'a> Parser<'a>,
-    A1: for<'a> Parser<'a>,
-    A2: for<'a> Parser<'a>,
->(
-    a0: A0,
-    a1: A1,
-    a2: A2,
-) -> Permutation<(A0, A1, A2)> {
-    Permutation {
-        parsers: (a0, a1, a2),
-    }
-}
+impl_permutation!(2; A0 s0 0, A1 s1 1);
+impl_permutation!(3; A0 s0 0, A1 s1 1, A2 s2 2);
+impl_permutation_ctor!(permutation2; A0 a0, A1 a1);
+impl_permutation_ctor!(permutation3; A0 a0, A1 a1, A2 a2);
 /// Комбинатор списка из любого числа элементов, которые надо читать
 /// вложенным парсером. Граница списка определяется квадратными (`[`&`]`)
 /// скобками.
@@ -791,180 +687,37 @@ fn list<T: for<'a> Parser<'a>>(parser: T) -> List<T> {
 /// Комбинатор, который вернёт тот результат, который будет успешно
 /// получен первым из дочерних комбинаторов
 /// (аналог `alt` из `nom`)
-#[derive(Debug, Clone)]
-pub struct Alt<T> {
-    parser: T,
+///
+/// Все ветки стёрты в один trait object, т.к. у них общий `Dest` -
+/// в отличие от [All] и [Permutation], здесь незачем плодить отдельный impl
+/// на каждое количество веток
+pub struct Alt<D> {
+    branches: Vec<Box<dyn for<'a> Parser<'a, Dest = D>>>,
 }
-impl<'a, A0, A1, Dest> Parser<'a> for Alt<(A0, A1)>
-where
-    A0: Parser<'a, Dest = Dest>,
-    A1: Parser<'a, Dest = Dest>,
-{
-    type Dest = Dest;
+impl<'a, D> Parser<'a> for Alt<D> {
+    type Dest = D;
 
     fn parse(
         &self,
         input: &'a str,
     ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        if let Ok(ok) = self.parser.0.parse(input) {
-            return Ok(ok);
+        let (last, rest) = self
+            .branches
+            .split_last()
+            .expect("Alt requires at least one branch");
+        for branch in rest {
+            if let Ok(ok) = branch.parse(input) {
+                return Ok(ok);
+            }
         }
-        self.parser.1.parse(input)
+        last.parse(input)
     }
 }
-/// Конструктор [Alt] для двух парсеров
-fn alt2<Dest, A0, A1>(a0: A0, a1: A1) -> Alt<(A0, A1)>
-where
-    A0: for<'a> Parser<'a, Dest = Dest>,
-    A1: for<'a> Parser<'a, Dest = Dest>,
-{
-    Alt { parser: (a0, a1) }
-}
-impl<'a, A0, A1, A2, Dest> Parser<'a> for Alt<(A0, A1, A2)>
-where
-    A0: Parser<'a, Dest = Dest>,
-    A1: Parser<'a, Dest = Dest>,
-    A2: Parser<'a, Dest = Dest>,
-{
-    type Dest = Dest;
-
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        // match вместо тут не подойдёт - нужно лениво
-        if let Ok(ok) = self.parser.0.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.1.parse(input) {
-            return Ok(ok);
-        }
-        self.parser.2.parse(input)
-    }
-}
-/// Конструктор [Alt] для трёх парсеров
-
-fn alt3<Dest, A0, A1, A2>(a0: A0, a1: A1, a2: A2) -> Alt<(A0, A1, A2)>
-where
-    A0: for<'a> Parser<'a, Dest = Dest>,
-    A1: for<'a> Parser<'a, Dest = Dest>,
-    A2: for<'a> Parser<'a, Dest = Dest>,
-{
-    Alt {
-        parser: (a0, a1, a2),
-    }
-}
-impl<'a, A0, A1, A2, A3, Dest> Parser<'a> for Alt<(A0, A1, A2, A3)>
-where
-    A0: Parser<'a, Dest = Dest>,
-    A1: Parser<'a, Dest = Dest>,
-    A2: Parser<'a, Dest = Dest>,
-    A3: Parser<'a, Dest = Dest>,
-{
-    type Dest = Dest;
-
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        if let Ok(ok) = self.parser.0.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.1.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.2.parse(input) {
-            return Ok(ok);
-        }
-        self.parser.3.parse(input)
-    }
-}
-/// Конструктор [Alt] для четырёх парсеров
-
-fn alt4<Dest, A0, A1, A2, A3>(
-    a0: A0,
-    a1: A1,
-    a2: A2,
-    a3: A3,
-) -> Alt<(A0, A1, A2, A3)>
-where
-    A0: for<'a> Parser<'a, Dest = Dest>,
-    A1: for<'a> Parser<'a, Dest = Dest>,
-    A2: for<'a> Parser<'a, Dest = Dest>,
-    A3: for<'a> Parser<'a, Dest = Dest>,
-{
-    Alt {
-        parser: (a0, a1, a2, a3),
-    }
-}
-impl<'a, A0, A1, A2, A3, A4, A5, A6, A7, Dest> Parser<'a>
-    for Alt<(A0, A1, A2, A3, A4, A5, A6, A7)>
-where
-    A0: Parser<'a, Dest = Dest>,
-    A1: Parser<'a, Dest = Dest>,
-    A2: Parser<'a, Dest = Dest>,
-    A3: Parser<'a, Dest = Dest>,
-    A4: Parser<'a, Dest = Dest>,
-    A5: Parser<'a, Dest = Dest>,
-    A6: Parser<'a, Dest = Dest>,
-    A7: Parser<'a, Dest = Dest>,
-{
-    type Dest = Dest;
-
-    fn parse(
-        &self,
-        input: &'a str,
-    ) -> Result<(&'a str, Self::Dest), ParsingError> {
-        if let Ok(ok) = self.parser.0.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.1.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.2.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.3.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.4.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.5.parse(input) {
-            return Ok(ok);
-        }
-        if let Ok(ok) = self.parser.6.parse(input) {
-            return Ok(ok);
-        }
-        self.parser.7.parse(input)
-    }
-}
-/// Конструктор [Alt] для восьми парсеров
-
-#[allow(clippy::too_many_arguments)]
-fn alt8<Dest, A0, A1, A2, A3, A4, A5, A6, A7>(
-    a0: A0,
-    a1: A1,
-    a2: A2,
-    a3: A3,
-    a4: A4,
-    a5: A5,
-    a6: A6,
-    a7: A7,
-) -> Alt<(A0, A1, A2, A3, A4, A5, A6, A7)>
-where
-    A0: for<'a> Parser<'a, Dest = Dest>,
-    A1: for<'a> Parser<'a, Dest = Dest>,
-    A2: for<'a> Parser<'a, Dest = Dest>,
-    A3: for<'a> Parser<'a, Dest = Dest>,
-    A4: for<'a> Parser<'a, Dest = Dest>,
-    A5: for<'a> Parser<'a, Dest = Dest>,
-    A6: for<'a> Parser<'a, Dest = Dest>,
-    A7: for<'a> Parser<'a, Dest = Dest>,
-{
-    Alt {
-        parser: (a0, a1, a2, a3, a4, a5, a6, a7),
-    }
+/// Конструктор [Alt] из любого числа веток
+fn alt<D>(
+    branches: Vec<Box<dyn for<'a> Parser<'a, Dest = D>>>,
+) -> Alt<D> {
+    Alt { branches }
 }
 
 /// Комбинатор для применения дочернего парсера N раз
@@ -1017,10 +770,7 @@ pub enum Status {
     Err(String),
 }
 impl Parsable for Status {
-    type Parser = Alt<(
-        Map<Tag, fn(()) -> Self>,
-        Map<Delimited<Tag, Unquote, Tag>, fn(Cow<str>) -> Self>,
-    )>;
+    type Parser = Alt<Self>;
 
     fn parser() -> Self::Parser {
         fn to_ok(_: ()) -> Status {
@@ -1029,10 +779,10 @@ impl Parsable for Status {
         fn to_err(error: Cow<str>) -> Status {
             Status::Err(error.into_owned())
         }
-        alt2(
-            map(tag("Ok"), to_ok),
-            map(delimited(tag("Err("), unquote(), tag(")")), to_err),
-        )
+        alt(vec![
+            Box::new(map(tag("Ok"), to_ok)),
+            Box::new(map(delimited(tag("Err("), unquote(), tag(")")), to_err)),
+        ])
     }
 }
 
@@ -1214,25 +964,13 @@ where
 }
 
 impl Parsable for SystemLogErrorKind {
-    type Parser = Preceded<
-        Tag,
-        Alt<(
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> SystemLogErrorKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> SystemLogErrorKind,
-            >,
-        )>,
-    >;
+    type Parser = Preceded<Tag, Alt<Self>>;
 
     fn parser() -> Self::Parser {
         preceded(
             tag("Error"),
-            alt2(
-                map(
+            alt(vec![
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("NetworkError")),
                         strip_whitespace(unquote()),
@@ -1240,8 +978,8 @@ impl Parsable for SystemLogErrorKind {
                     |error: Cow<str>| {
                         SystemLogErrorKind::NetworkError(error.into_owned())
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("AccessDenied")),
                         strip_whitespace(unquote()),
@@ -1249,31 +987,19 @@ impl Parsable for SystemLogErrorKind {
                     |error: Cow<str>| {
                         SystemLogErrorKind::AccessDenied(error.into_owned())
                     },
-                ),
-            ),
+                )),
+            ]),
         )
     }
 }
 impl Parsable for SystemLogTraceKind {
-    type Parser = Preceded<
-        Tag,
-        Alt<(
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> SystemLogTraceKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> SystemLogTraceKind,
-            >,
-        )>,
-    >;
+    type Parser = Preceded<Tag, Alt<Self>>;
 
     fn parser() -> Self::Parser {
         preceded(
             tag("Trace"),
-            alt2(
-                map(
+            alt(vec![
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("SendRequest")),
                         strip_whitespace(unquote()),
@@ -1281,8 +1007,8 @@ impl Parsable for SystemLogTraceKind {
                     |request: Cow<str>| {
                         SystemLogTraceKind::SendRequest(request.into_owned())
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("GetResponse")),
                         strip_whitespace(unquote()),
@@ -1290,62 +1016,36 @@ impl Parsable for SystemLogTraceKind {
                     |response: Cow<str>| {
                         SystemLogTraceKind::GetResponse(response.into_owned())
                     },
-                ),
-            ),
+                )),
+            ]),
         )
     }
 }
 impl Parsable for SystemLogKind {
-    type Parser = StripWhitespace<
-        Preceded<
-            Tag,
-            Alt<(
-                Map<
-                    <SystemLogTraceKind as Parsable>::Parser,
-                    fn(SystemLogTraceKind) -> SystemLogKind,
-                >,
-                Map<
-                    <SystemLogErrorKind as Parsable>::Parser,
-                    fn(SystemLogErrorKind) -> SystemLogKind,
-                >,
-            )>,
-        >,
-    >;
+    type Parser = StripWhitespace<Preceded<Tag, Alt<Self>>>;
 
     fn parser() -> Self::Parser {
         strip_whitespace(preceded(
             tag("System::"),
-            alt2(
-                map(SystemLogTraceKind::parser(), |trace| {
+            alt(vec![
+                Box::new(map(SystemLogTraceKind::parser(), |trace| {
                     SystemLogKind::Trace(trace)
-                }),
-                map(SystemLogErrorKind::parser(), |error| {
+                })),
+                Box::new(map(SystemLogErrorKind::parser(), |error| {
                     SystemLogKind::Error(error)
-                }),
-            ),
+                })),
+            ]),
         ))
     }
 }
 impl Parsable for AppLogErrorKind {
-    type Parser = Preceded<
-        Tag,
-        Alt<(
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> AppLogErrorKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> AppLogErrorKind,
-            >,
-        )>,
-    >;
+    type Parser = Preceded<Tag, Alt<Self>>;
 
     fn parser() -> Self::Parser {
         preceded(
             tag("Error"),
-            alt2(
-                map(
+            alt(vec![
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("LackOf")),
                         strip_whitespace(unquote()),
@@ -1353,8 +1053,8 @@ impl Parsable for AppLogErrorKind {
                     |error: Cow<str>| {
                         AppLogErrorKind::LackOf(error.into_owned())
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("SystemError")),
                         strip_whitespace(unquote()),
@@ -1362,52 +1062,26 @@ impl Parsable for AppLogErrorKind {
                     |error: Cow<str>| {
                         AppLogErrorKind::SystemError(error.into_owned())
                     },
-                ),
-            ),
+                )),
+            ]),
         )
     }
 }
 impl Parsable for AppLogTraceKind {
-    type Parser = Preceded<
-        Tag,
-        Alt<(
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    StripWhitespace<<AuthData as Parsable>::Parser>,
-                >,
-                fn(AuthData) -> AppLogTraceKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> AppLogTraceKind,
-            >,
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    StripWhitespace<<Announcements as Parsable>::Parser>,
-                >,
-                fn(Announcements) -> AppLogTraceKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, StripWhitespace<Unquote>>,
-                fn(Cow<str>) -> AppLogTraceKind,
-            >,
-        )>,
-    >;
+    type Parser = Preceded<Tag, Alt<Self>>;
 
     fn parser() -> Self::Parser {
         preceded(
             tag("Trace"),
-            alt4(
-                map(
+            alt(vec![
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("Connect")),
                         strip_whitespace(AuthData::parser()),
                     ),
                     |authdata| AppLogTraceKind::Connect(Box::new(authdata)),
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("SendRequest")),
                         strip_whitespace(unquote()),
@@ -1415,15 +1089,15 @@ impl Parsable for AppLogTraceKind {
                     |trace: Cow<str>| {
                         AppLogTraceKind::SendRequest(trace.into_owned())
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("Check")),
                         strip_whitespace(Announcements::parser()),
                     ),
                     |announcements| AppLogTraceKind::Check(announcements),
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("GetResponse")),
                         strip_whitespace(unquote()),
@@ -1431,95 +1105,19 @@ impl Parsable for AppLogTraceKind {
                     |trace: Cow<str>| {
                         AppLogTraceKind::GetResponse(trace.into_owned())
                     },
-                ),
-            ),
+                )),
+            ]),
         )
     }
 }
 impl Parsable for AppLogJournalKind {
-    type Parser = Preceded<
-        Tag,
-        Alt<(
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    Delimited<
-                        Tag,
-                        Permutation<(
-                            KeyValue<ParseUserId>,
-                            KeyValue<NonZeroU32>,
-                        )>,
-                        Tag,
-                    >,
-                >,
-                fn((UserId, NonZeroU32)) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    Delimited<Tag, KeyValue<ParseUserId>, Tag>,
-                >,
-                fn(UserId) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    Delimited<
-                        Tag,
-                        Permutation<(
-                            KeyValue<ParseAssetIdentifier>,
-                            KeyValue<ParseUserId>,
-                            KeyValue<ParseLiquidity>,
-                        )>,
-                        Tag,
-                    >,
-                >,
-                fn((AssetIdentifier, UserId, Liquidity)) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    Delimited<
-                        Tag,
-                        Permutation<(
-                            KeyValue<ParseAssetIdentifier>,
-                            KeyValue<ParseUserId>,
-                        )>,
-                        Tag,
-                    >,
-                >,
-                fn((AssetIdentifier, UserId)) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, <UserCash as Parsable>::Parser>,
-                fn(UserCash) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<StripWhitespace<Tag>, <UserCash as Parsable>::Parser>,
-                fn(UserCash) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    <UserBucket as Parsable>::Parser,
-                >,
-                fn(UserBucket) -> AppLogJournalKind,
-            >,
-            Map<
-                Preceded<
-                    StripWhitespace<Tag>,
-                    <UserBucket as Parsable>::Parser,
-                >,
-                fn(UserBucket) -> AppLogJournalKind,
-            >,
-        )>,
-    >;
+    type Parser = Preceded<Tag, Alt<Self>>;
 
     fn parser() -> Self::Parser {
         preceded(
             tag("Journal"),
-            alt8(
-                map(
+            alt(vec![
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("CreateUser")),
                         delimited(
@@ -1540,8 +1138,8 @@ impl Parsable for AppLogJournalKind {
                             authorized_capital,
                         }
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("DeleteUser")),
                         delimited(
@@ -1551,8 +1149,8 @@ impl Parsable for AppLogJournalKind {
                         ),
                     ),
                     |user_id: UserId| AppLogJournalKind::DeleteUser { user_id },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("RegisterAsset")),
                         delimited(
@@ -1576,8 +1174,8 @@ impl Parsable for AppLogJournalKind {
                             liquidity,
                         }
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("UnregisterAsset")),
                         delimited(
@@ -1592,93 +1190,69 @@ impl Parsable for AppLogJournalKind {
                     |(asset_id, user_id): (AssetIdentifier, UserId)| {
                         AppLogJournalKind::UnregisterAsset { asset_id, user_id }
                     },
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("DepositCash")),
                         UserCash::parser(),
                     ),
                     |user_cash| AppLogJournalKind::DepositCash(user_cash),
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("WithdrawCash")),
                         UserCash::parser(),
                     ),
                     |user_cash| AppLogJournalKind::WithdrawCash(user_cash),
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("BuyAsset")),
                         UserBucket::parser(),
                     ),
                     |user_bucket| AppLogJournalKind::BuyAsset(user_bucket),
-                ),
-                map(
+                )),
+                Box::new(map(
                     preceded(
                         strip_whitespace(tag("SellAsset")),
                         UserBucket::parser(),
                     ),
                     |user_bucket| AppLogJournalKind::SellAsset(user_bucket),
-                ),
-            ),
+                )),
+            ]),
         )
     }
 }
 impl Parsable for AppLogKind {
-    type Parser = StripWhitespace<
-        Preceded<
-            Tag,
-            Alt<(
-                Map<
-                    <AppLogErrorKind as Parsable>::Parser,
-                    fn(AppLogErrorKind) -> AppLogKind,
-                >,
-                Map<
-                    <AppLogTraceKind as Parsable>::Parser,
-                    fn(AppLogTraceKind) -> AppLogKind,
-                >,
-                Map<
-                    <AppLogJournalKind as Parsable>::Parser,
-                    fn(AppLogJournalKind) -> AppLogKind,
-                >,
-            )>,
-        >,
-    >;
+    type Parser = StripWhitespace<Preceded<Tag, Alt<Self>>>;
 
     fn parser() -> Self::Parser {
         strip_whitespace(preceded(
             tag("App::"),
-            alt3(
-                map(AppLogErrorKind::parser(), |error| {
+            alt(vec![
+                Box::new(map(AppLogErrorKind::parser(), |error| {
                     AppLogKind::Error(error)
-                }),
-                map(AppLogTraceKind::parser(), |trace| {
+                })),
+                Box::new(map(AppLogTraceKind::parser(), |trace| {
                     AppLogKind::Trace(trace)
-                }),
-                map(AppLogJournalKind::parser(), |journal| {
+                })),
+                Box::new(map(AppLogJournalKind::parser(), |journal| {
                     AppLogKind::Journal(journal)
-                }),
-            ),
+                })),
+            ]),
         ))
     }
 }
 impl Parsable for LogKind {
-    type Parser = StripWhitespace<
-        Alt<(
-            Map<
-                <SystemLogKind as Parsable>::Parser,
-                fn(SystemLogKind) -> LogKind,
-            >,
-            Map<<AppLogKind as Parsable>::Parser, fn(AppLogKind) -> LogKind>,
-        )>,
-    >;
+    type Parser = StripWhitespace<Alt<Self>>;
 
     fn parser() -> Self::Parser {
-        strip_whitespace(alt2(
-            map(SystemLogKind::parser(), |system| LogKind::System(system)),
-            map(AppLogKind::parser(), |app| LogKind::App(app)),
-        ))
+        strip_whitespace(alt(vec![
+            Box::new(map(SystemLogKind::parser(), |system| {
+                LogKind::System(system)
+            })),
+            Box::new(map(AppLogKind::parser(), |app| LogKind::App(app))),
+        ]))
     }
 }
 impl Parsable for LogLine {
@@ -2308,11 +1882,15 @@ mod test {
         );
     }
 
-    // ----- Alt (3, 4, 8 args) -----
+    // ----- Alt (N args) -----
 
     #[test]
     fn test_alt3() {
-        let p = alt3(tag("a"), tag("b"), tag("c"));
+        let p = alt(vec![
+            Box::new(tag("a")),
+            Box::new(tag("b")),
+            Box::new(tag("c")),
+        ]);
         assert_eq!(p.parse("arest"), Ok(("rest", ())));
         assert_eq!(p.parse("brest"), Ok(("rest", ())));
         assert_eq!(p.parse("crest"), Ok(("rest", ())));
@@ -2321,23 +1899,28 @@ mod test {
 
     #[test]
     fn test_alt4() {
-        let p = alt4(tag("a"), tag("b"), tag("c"), tag("d"));
+        let p = alt(vec![
+            Box::new(tag("a")),
+            Box::new(tag("b")),
+            Box::new(tag("c")),
+            Box::new(tag("d")),
+        ]);
         assert_eq!(p.parse("drest"), Ok(("rest", ())));
         assert_eq!(p.parse("erest"), Err(ParsingError::ParseTagError));
     }
 
     #[test]
     fn test_alt8_picks_first_match_and_last_error() {
-        let p = alt8(
-            tag("a"),
-            tag("b"),
-            tag("c"),
-            tag("d"),
-            tag("e"),
-            tag("f"),
-            tag("g"),
-            tag("h"),
-        );
+        let p: Alt<()> = alt(vec![
+            Box::new(tag("a")),
+            Box::new(tag("b")),
+            Box::new(tag("c")),
+            Box::new(tag("d")),
+            Box::new(tag("e")),
+            Box::new(tag("f")),
+            Box::new(tag("g")),
+            Box::new(tag("h")),
+        ]);
         for (letter, rest) in [
             ("a", "1"),
             ("b", "1"),
