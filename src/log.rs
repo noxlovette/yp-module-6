@@ -1,4 +1,8 @@
-use crate::domain::{Announcements, AuthData, UserBucket, UserCash};
+use std::num::NonZeroU32;
+
+use crate::domain::{
+    Announcements, AssetIdentifier, AuthData, UserBucket, UserCash, UserId,
+};
 
 /// Строка логов, [лог](AppLogKind) с `request_id`
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +30,7 @@ impl LogLine {
     pub fn is_error(&self) -> bool {
         self.kind.is_error()
     }
+
     pub fn is_exchange(&self) -> bool {
         self.kind.is_exchange()
     }
@@ -39,6 +44,7 @@ impl LogKind {
                 | LogKind::App(AppLogKind::Error(_))
         )
     }
+
     pub fn is_exchange(&self) -> bool {
         matches!(
             &self,
@@ -98,20 +104,20 @@ pub enum AppLogTraceKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppLogJournalKind {
     CreateUser {
-        user_id: String,
-        authorized_capital: u32,
+        user_id: UserId,
+        authorized_capital: NonZeroU32,
     },
     DeleteUser {
-        user_id: String,
+        user_id: UserId,
     },
     RegisterAsset {
-        asset_id: String,
-        user_id: String,
-        liquidity: u32,
+        asset_id: AssetIdentifier,
+        user_id: UserId,
+        liquidity: NonZeroU32,
     },
     UnregisterAsset {
-        asset_id: String,
-        user_id: String,
+        asset_id: AssetIdentifier,
+        user_id: UserId,
     },
     DepositCash(UserCash),
     WithdrawCash(UserCash),

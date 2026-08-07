@@ -1,11 +1,12 @@
 use crate::error::ParsingError;
-use std::{ops::Deref, str::FromStr};
+use std::{num::NonZeroU32, ops::Deref, str::FromStr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssetIdentifier(String);
 
 impl FromStr for AssetIdentifier {
     type Err = ParsingError;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
             Err(ParsingError::ParseUserIdError)
@@ -34,6 +35,7 @@ pub struct UserId(String);
 
 impl FromStr for UserId {
     type Err = ParsingError;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
             Err(ParsingError::ParseUserIdError)
@@ -107,7 +109,12 @@ pub struct UserBuckets {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserCash {
     user_id: UserId,
-    count: u32,
+    count: NonZeroU32,
+}
+impl UserCash {
+    pub fn new(user_id: UserId, count: NonZeroU32) -> Self {
+        Self { user_id, count }
+    }
 }
 
 pub const AUTHDATA_SIZE: usize = 1024;

@@ -6,7 +6,7 @@ pub mod domain;
 mod error;
 pub mod log;
 pub mod parse;
-use crate::log::LogLine;
+use crate::{error::ParsingError, log::LogLine};
 pub use error::Error;
 use parse::*;
 use std::io::Read;
@@ -43,7 +43,8 @@ where
                     .as_ref()
                     .ok()
                     .map(|line| line.trim().is_empty())
-                    // used to be or(false) - useless as the default is false anyway
+                    // used to be or(false) - useless as the default is false
+                    // anyway
                     .unwrap_or_default()
             },
         ))
@@ -53,32 +54,55 @@ impl<R> Iterator for LogIterator<R>
 where
     R: Read,
 {
-    type Item = LogLine;
+    type Item = Result<LogLine, Error>;
 
+    // строка, не читающаяся до конца (io-ошибка) молча обрывает поток -
+    // это конец файла/соединения, а не проблема конкретной строки.
+    // а вот строка, которая не распарсилась (или распарсилась не целиком) -
+    // настоящая ошибка данных, и её больше не проглатываем
     fn next(&mut self) -> Option<Self::Item> {
         let line = self.0.next()?.ok()?;
-        let (remaining, result) =
-            LOG_LINE_PARSER.parse(line.trim().to_string()).ok()?;
-        remaining.trim().is_empty().then_some(result)
+        Some(
+            LOG_LINE_PARSER
+                .parse(line.trim())
+                .map_err(Error::from)
+                .and_then(|(remaining, result)| {
+                    if remaining.trim().is_empty() {
+                        Ok(result)
+                    } else {
+                        Err(ParsingError::TrailingInput.into())
+                    }
+                }),
+        )
     }
 }
 
 /// Принимает поток байт, отдаёт отфильтрованные и распарсенные логи
 ///
-/// Фильтрует по режиму чтения [ReadMode] и request_ids, которые интересны caller
+/// Фильтрует по режиму чтения [ReadMode] и request_ids, которые интересны
+/// caller. Останавливается на первой строке, которую не удалось распарсить,
+/// вместо того чтобы молча её пропустить
 pub fn read_log(
     input: impl Read,
     mode: ReadMode,
     request_ids: Vec<u32>,
-) -> Vec<LogLine> {
+) -> Result<Vec<LogLine>, Error> {
     use ReadMode::*;
-    let logs = LogIterator::new(input)
-        .filter(|l| request_ids.contains(&l.request_id()));
-    match mode {
-        All => logs.collect(),
-        Errors => logs.filter(|l| l.is_error()).collect(),
-        Exchanges => logs.filter(|l| l.is_exchange()).collect(),
-    }
+    LogIterator::new(input)
+        .filter(|line| {
+            line.as_ref()
+                .map(|l| {
+                    request_ids.contains(&l.request_id())
+                        && match mode {
+                            All => true,
+                            Errors => l.is_error(),
+                            Exchanges => l.is_exchange(),
+                        }
+                })
+                // ошибку не отфильтровываем - иначе она снова молча исчезнет
+                .unwrap_or(true)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -155,6 +179,5 @@ App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"m
     #[test]
     fn test_all() {
         todo!();
-        assert_eq!(all_parsed.len(), SOURCE.lines().count() - 2 - 7);
     }
 }
