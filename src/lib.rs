@@ -1,13 +1,26 @@
+//! Крейт для чтения логов
+
+#![warn(missing_docs)]
+
+pub mod bucket;
+mod error;
+pub mod log;
 pub mod parse;
+
+pub use error::Error;
 use parse::*;
 
-// подсказка: лучше использовать enum и match
-/// Режим чтения из логов всего подряд
-pub const READ_MODE_ALL: u8 = 0;
-/// Режим чтения из логов только ошибок
-pub const READ_MODE_ERRORS: u8 = 1;
-/// Режим чтения из логов только операций, касающихся деген
-pub const READ_MODE_EXCHANGES: u8 = 2;
+use crate::log::LogLine;
+
+/// Режим чтения
+pub enum ReadMode {
+    /// Режим чтения из логов всего подряд
+    All,
+    /// Режим чтения из логов только ошибок
+    Errors,
+    /// Режим чтения из логов только операций, касающихся деген
+    Exchanges,
+}
 
 /// Обёртка, без которой не выполнено требование `std::io::BufReader<T:
 /// std::io::Read>`
@@ -70,7 +83,7 @@ impl LogIterator {
     }
 }
 impl Iterator for LogIterator {
-    type Item = parse::LogLine;
+    type Item = LogLine;
 
     fn next(&mut self) -> Option<Self::Item> {
         let line = self.lines.next()?.ok()?;
@@ -82,60 +95,21 @@ impl Iterator for LogIterator {
 
 // подсказка: RefCell вообще не нужен
 /// Принимает поток байт, отдаёт отфильтрованные и распарсенные логи
+///
+/// Фильтрует по режиму чтения [ReadMode] и request_ids, которые интересны caller
 pub fn read_log(
     input: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>>,
-    mode: u8,
+    mode: ReadMode,
     request_ids: Vec<u32>,
 ) -> Vec<LogLine> {
-    let logs = LogIterator::new(input);
-    let mut collected = Vec::new();
-    // подсказка: можно обойтись итераторами
-    for log in logs {
-        if request_ids.is_empty()
-            || {
-            let mut request_id_found = false;
-            for request_id in &request_ids {
-                if *request_id == log.request_id {
-                    request_id_found = true;
-                    break;
-                }
-            }
-            request_id_found
-        }
-        // подсказка: лучше match
-        && if mode == READ_MODE_ALL {
-                true
-            }
-            else if mode == READ_MODE_ERRORS {
-                matches!(
-                    &log.kind,
-                    LogKind::System(
-                        SystemLogKind::Error(_)) | LogKind::App(AppLogKind::Error(_)
-                    )
-                )
-            }
-            else if mode == READ_MODE_EXCHANGES {
-                matches!(
-                    &log.kind,
-                    LogKind::App(AppLogKind::Journal(
-                        AppLogJournalKind::BuyAsset(_)
-                        | AppLogJournalKind::SellAsset(_)
-                        | AppLogJournalKind::CreateUser{..}
-                        | AppLogJournalKind::RegisterAsset{..}
-                        | AppLogJournalKind::DepositCash(_)
-                        | AppLogJournalKind::WithdrawCash(_)
-                    ))
-                )
-            }
-            else {
-                // подсказка: паниковать в библиотечном коде - нехорошо
-                panic!("unknown mode {}", mode)
-            }
-        {
-            collected.push(log);
-        }
+    use ReadMode::*;
+    let logs = LogIterator::new(input)
+        .filter(|l| request_ids.contains(&l.request_id()));
+    match mode {
+        All => logs.collect(),
+        Errors => logs.filter(|l| l.is_error()).collect(),
+        Exchanges => logs.filter(|l| l.is_exchange()).collect(),
     }
-    collected
 }
 
 #[cfg(test)]

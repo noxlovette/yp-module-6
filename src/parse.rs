@@ -1,3 +1,12 @@
+use crate::{
+    bucket::Bucket,
+    log::{
+        AppLogErrorKind, AppLogJournalKind, AppLogKind, AppLogTraceKind,
+        LogKind, LogLine, SystemLogErrorKind, SystemLogKind,
+        SystemLogTraceKind,
+    },
+};
+
 /// Трейт, чтобы **реализовывать** и **требовать** метод 'распарсь и покажи,
 /// что распарсить осталось'
 trait Parser {
@@ -887,12 +896,7 @@ impl Parsable for AssetDsc {
         )
     }
 }
-/// Сведение о предмете в некотором количестве
-#[derive(Debug, Clone, PartialEq)]
-pub struct Bucket {
-    pub asset_id: String,
-    pub count: u32,
-}
+
 impl Parsable for Bucket {
     type Parser = Map<
         Delimited<
@@ -953,12 +957,14 @@ impl Parsable for UserCash {
         )
     }
 }
+
 /// [Bucket] конкретного пользователя
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBucket {
     pub user_id: String,
-    pub Bucket: Bucket,
+    pub bucket: Bucket,
 }
+
 impl Parsable for UserBucket {
     type Parser = Map<
         Delimited<
@@ -985,7 +991,7 @@ impl Parsable for UserBucket {
                 ),
                 strip_whitespace(tag("}")),
             ),
-            |(user_id, Bucket)| UserBucket { user_id, Bucket },
+            |(user_id, bucket)| UserBucket { user_id, bucket },
         )
     }
 }
@@ -993,7 +999,7 @@ impl Parsable for UserBucket {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBuckets {
     pub user_id: String,
-    pub Buckets: Vec<Bucket>,
+    pub buckets: Vec<Bucket>,
 }
 impl Parsable for UserBuckets {
     type Parser = Map<
@@ -1017,17 +1023,18 @@ impl Parsable for UserBuckets {
                 ),
                 permutation2(
                     key_value("user_id", unquote()),
-                    key_value("Buckets", list(Bucket::parser())),
+                    key_value("buckets", list(Bucket::parser())),
                 ),
                 strip_whitespace(tag("}")),
             ),
-            |(user_id, Buckets)| UserBuckets { user_id, Buckets },
+            |(user_id, buckets)| UserBuckets { user_id, buckets },
         )
     }
 }
 /// Список опубликованных бакетов
 #[derive(Debug, Clone, PartialEq)]
 pub struct Announcements(Vec<UserBuckets>);
+
 impl Parsable for Announcements {
     type Parser = Map<
         List<<UserBuckets as Parsable>::Parser>,
@@ -1049,7 +1056,7 @@ pub fn just_parse_asset_dsc(input: String) -> Result<(String, AssetDsc), ()> {
     <AssetDsc as Parsable>::parser().parse(input)
 }
 /// Обёртка для парсинга [Bucket]
-pub fn just_parse_Bucket(input: String) -> Result<(String, Bucket), ()> {
+pub fn just_parse_bucket(input: String) -> Result<(String, Bucket), ()> {
     <Bucket as Parsable>::parser().parse(input)
 }
 /// Обёртка для парсинга [UserCash]
@@ -1057,11 +1064,11 @@ pub fn just_user_cash(input: String) -> Result<(String, UserCash), ()> {
     <UserCash as Parsable>::parser().parse(input)
 }
 /// Обёртка для парсинга [UserBucket]
-pub fn just_user_Bucket(input: String) -> Result<(String, UserBucket), ()> {
+pub fn just_user_bucket(input: String) -> Result<(String, UserBucket), ()> {
     <UserBucket as Parsable>::parser().parse(input)
 }
 /// Обёртка для парсинга [UserBuckets]
-pub fn just_user_Buckets(input: String) -> Result<(String, UserBuckets), ()> {
+pub fn just_user_buckets(input: String) -> Result<(String, UserBuckets), ()> {
     <UserBuckets as Parsable>::parser().parse(input)
 }
 /// Обёртка для парсинга [Announcements]
@@ -1069,77 +1076,6 @@ pub fn just_parse_anouncements(
     input: String,
 ) -> Result<(String, Announcements), ()> {
     <Announcements as Parsable>::parser().parse(input)
-}
-
-/// Все виды логов
-#[derive(Debug, Clone, PartialEq)]
-pub enum LogKind {
-    System(SystemLogKind),
-    App(AppLogKind),
-}
-/// Все виды [системных](LogKind) логов
-#[derive(Debug, Clone, PartialEq)]
-pub enum SystemLogKind {
-    Error(SystemLogErrorKind),
-    Trace(SystemLogTraceKind),
-}
-/// Trace [системы](SystemLogKind)
-#[derive(Debug, Clone, PartialEq)]
-pub enum SystemLogTraceKind {
-    SendRequest(String),
-    GetResponse(String),
-}
-/// Error [системы](SystemLogKind)
-#[derive(Debug, Clone, PartialEq)]
-pub enum SystemLogErrorKind {
-    NetworkError(String),
-    AccessDenied(String),
-}
-/// Все виды [логов приложения](LogKind) логов
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppLogKind {
-    Error(AppLogErrorKind),
-    Trace(AppLogTraceKind),
-    Journal(AppLogJournalKind),
-}
-/// Error [приложения](AppLogKind)
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppLogErrorKind {
-    LackOf(String),
-    SystemError(String),
-}
-// подсказка: а поля не слишком много места на стэке занимают?
-/// Trace [приложения](AppLogKind)
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppLogTraceKind {
-    Connect(AuthData),
-    SendRequest(String),
-    Check(Announcements),
-    GetResponse(String),
-}
-/// Журнал [приложения](AppLogKind), самые высокоуровневые события
-#[derive(Debug, Clone, PartialEq)]
-pub enum AppLogJournalKind {
-    CreateUser {
-        user_id: String,
-        authorized_capital: u32,
-    },
-    DeleteUser {
-        user_id: String,
-    },
-    RegisterAsset {
-        asset_id: String,
-        user_id: String,
-        liquidity: u32,
-    },
-    UnregisterAsset {
-        asset_id: String,
-        user_id: String,
-    },
-    DepositCash(UserCash),
-    WithdrawCash(UserCash),
-    BuyAsset(UserBucket),
-    SellAsset(UserBucket),
 }
 impl Parsable for SystemLogErrorKind {
     type Parser = Preceded<
@@ -1512,14 +1448,14 @@ impl Parsable for AppLogJournalKind {
                         strip_whitespace(tag("BuyAsset")),
                         UserBucket::parser(),
                     ),
-                    |user_Bucket| AppLogJournalKind::BuyAsset(user_Bucket),
+                    |user_bucket| AppLogJournalKind::BuyAsset(user_bucket),
                 ),
                 map(
                     preceded(
                         strip_whitespace(tag("SellAsset")),
                         UserBucket::parser(),
                     ),
-                    |user_Bucket| AppLogJournalKind::SellAsset(user_Bucket),
+                    |user_bucket| AppLogJournalKind::SellAsset(user_bucket),
                 ),
             ),
         )
@@ -1581,12 +1517,6 @@ impl Parsable for LogKind {
         ))
     }
 }
-/// Строка логов, [лог](AppLogKind) с `request_id`
-#[derive(Debug, Clone, PartialEq)]
-pub struct LogLine {
-    pub kind: LogKind,
-    pub request_id: u32,
-}
 impl Parsable for LogLine {
     type Parser = Map<
         All<(
@@ -1602,7 +1532,7 @@ impl Parsable for LogLine {
                 LogKind::parser(),
                 strip_whitespace(preceded(tag("requestid="), stdp::U32)),
             ),
-            |(kind, request_id)| LogLine { kind, request_id },
+            |(kind, request_id)| LogLine::new(kind, request_id),
         )
     }
 }
