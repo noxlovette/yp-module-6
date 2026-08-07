@@ -25,7 +25,7 @@ trait Parser<'a> {
 }
 /// Вспомогательный трейт, чтобы писать собственный десериализатор
 /// (по решаемой задаче - отдалённый аналог `serde::Deserialize`)
-trait Parsable: Sized {
+pub trait Parsable: Sized {
     type Parser: for<'a> Parser<'a, Dest = Self>;
     fn parser() -> Self::Parser;
 }
@@ -174,7 +174,7 @@ fn do_unquote(input: &str) -> Result<(&str, Cow<str>), ParsingError> {
 
 /// Парсер кавычек
 #[derive(Debug, Clone)]
-struct Unquote;
+pub struct Unquote;
 impl<'a> Parser<'a> for Unquote {
     type Dest = Cow<'a, str>;
 
@@ -192,7 +192,7 @@ fn unquote() -> Unquote {
 /// Парсер id пользователя (провалидированного через
 /// [FromStr](std::str::FromStr))
 #[derive(Debug, Clone)]
-struct ParseUserId;
+pub struct ParseUserId;
 impl<'a> Parser<'a> for ParseUserId {
     type Dest = UserId;
 
@@ -210,7 +210,7 @@ fn user_id() -> ParseUserId {
 }
 /// Парсер id предмета (провалидированного через [FromStr](std::str::FromStr))
 #[derive(Debug, Clone)]
-struct ParseAssetIdentifier;
+pub struct ParseAssetIdentifier;
 impl<'a> Parser<'a> for ParseAssetIdentifier {
     type Dest = AssetIdentifier;
 
@@ -242,7 +242,7 @@ impl<'a> Parser<'a> for AsIs {
 /// Парсер константных строк
 /// (аналог `nom::bytes::complete::tag`)
 #[derive(Debug, Clone)]
-struct Tag(&'static str);
+pub struct Tag(&'static str);
 
 impl Tag {
     pub fn new(t: &'static str) -> Self {
@@ -307,7 +307,7 @@ fn quoted_tag(t: &'static str) -> QuotedTag {
 }
 /// Комбинатор, пробрасывающий строку без лидирующих пробелов
 #[derive(Debug, Clone)]
-struct StripWhitespace<T> {
+pub struct StripWhitespace<T> {
     parser: T,
 }
 impl<'a, T: Parser<'a>> Parser<'a> for StripWhitespace<T> {
@@ -334,7 +334,7 @@ fn strip_whitespace<T: for<'a> Parser<'a>>(parser: T) -> StripWhitespace<T> {
 /// строкой - строка, оставшаяся после парсера3.
 /// (аналог `delimited` из `nom`)
 #[derive(Debug, Clone)]
-struct Delimited<Prefix, T, Suffix> {
+pub struct Delimited<Prefix, T, Suffix> {
     prefix_to_ignore: Prefix,
     dest_parser: T,
     suffix_to_ignore: Suffix,
@@ -378,7 +378,7 @@ where
 /// Комбинатор-отображение. Парсит дочерним парсером, преобразует результат так,
 /// как вызывающему хочется
 #[derive(Debug, Clone)]
-struct Map<T, M> {
+pub struct Map<T, M> {
     parser: T,
     map: M,
 }
@@ -407,7 +407,7 @@ where
 /// Комбинатор с отбрасываемым префиксом, упрощённая версия [Delimited]
 /// (аналог `preceeded` из `nom`)
 #[derive(Debug, Clone)]
-struct Preceded<Prefix, T> {
+pub struct Preceded<Prefix, T> {
     prefix_to_ignore: Prefix,
     dest_parser: T,
 }
@@ -443,7 +443,7 @@ where
 /// Комбинатор, который требует, чтобы все дочерние парсеры отработали,
 /// (аналог `all` из `nom`)
 #[derive(Debug, Clone)]
-struct All<T> {
+pub struct All<T> {
     parser: T,
 }
 impl<'a, A0, A1> Parser<'a> for All<(A0, A1)>
@@ -465,7 +465,6 @@ where
     }
 }
 /// Конструктор [All] для двух парсеров
-
 fn all2<A0: for<'a> Parser<'a>, A1: for<'a> Parser<'a>>(
     a0: A0,
     a1: A1,
@@ -493,7 +492,6 @@ where
     }
 }
 /// Конструктор [All] для трёх парсеров
-
 fn all3<
     A0: for<'a> Parser<'a>,
     A1: for<'a> Parser<'a>,
@@ -530,7 +528,6 @@ where
     }
 }
 /// Конструктор [All] для четырёх парсеров
-
 fn all4<
     A0: for<'a> Parser<'a>,
     A1: for<'a> Parser<'a>,
@@ -550,7 +547,7 @@ fn all4<
 /// Для простоты реализации, запятая всегда нужна в конце пары ключ-значение,
 /// простое '"ключ":значение' читаться не будет
 #[derive(Debug, Clone)]
-struct KeyValue<T> {
+pub struct KeyValue<T> {
     parser: Delimited<
         All<(StripWhitespace<QuotedTag>, StripWhitespace<Tag>)>,
         StripWhitespace<T>,
@@ -591,7 +588,7 @@ fn key_value<T: for<'a> Parser<'a>>(
 /// том порядке, в каком `Permutation` был сконструирован
 /// (аналог `permutation` из `nom`)
 #[derive(Debug, Clone)]
-struct Permutation<T> {
+pub struct Permutation<T> {
     parsers: T,
 }
 impl<'a, A0, A1> Parser<'a> for Permutation<(A0, A1)>
@@ -623,7 +620,6 @@ where
     }
 }
 /// Конструктор [Permutation] для двух парсеров
-
 fn permutation2<A0: for<'a> Parser<'a>, A1: for<'a> Parser<'a>>(
     a0: A0,
     a1: A1,
@@ -698,7 +694,6 @@ where
     }
 }
 /// Конструктор [Permutation] для трёх парсеров
-
 fn permutation3<
     A0: for<'a> Parser<'a>,
     A1: for<'a> Parser<'a>,
@@ -717,7 +712,7 @@ fn permutation3<
 /// скобками.
 /// Для простоты реализации, после каждого элемента списка должна быть запятая
 #[derive(Debug, Clone)]
-struct List<T> {
+pub struct List<T> {
     parser: T,
 }
 impl<'a, T: Parser<'a>> Parser<'a> for List<T> {
@@ -761,7 +756,7 @@ fn list<T: for<'a> Parser<'a>>(parser: T) -> List<T> {
 /// получен первым из дочерних комбинаторов
 /// (аналог `alt` из `nom`)
 #[derive(Debug, Clone)]
-struct Alt<T> {
+pub struct Alt<T> {
     parser: T,
 }
 impl<'a, A0, A1, Dest> Parser<'a> for Alt<(A0, A1)>
@@ -782,7 +777,6 @@ where
     }
 }
 /// Конструктор [Alt] для двух парсеров
-
 fn alt2<Dest, A0, A1>(a0: A0, a1: A1) -> Alt<(A0, A1)>
 where
     A0: for<'a> Parser<'a, Dest = Dest>,
@@ -939,7 +933,7 @@ where
 
 /// Комбинатор для применения дочернего парсера N раз
 /// (аналог `take` из `nom`)
-struct Take<T> {
+pub struct Take<T> {
     count: usize,
     parser: T,
 }
@@ -981,7 +975,8 @@ fn take<T: for<'a> Parser<'a>>(count: usize, parser: T) -> Take<T> {
 }
 
 /// Статус, которые можно парсить
-enum Status {
+#[derive(Debug, PartialEq)]
+pub enum Status {
     Ok,
     Err(String),
 }
@@ -1008,8 +1003,8 @@ impl Parsable for Status {
 /// Пара 'сокращённое название предмета' - 'его описание'
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssetDsc {
-    // `dsc` aka `description`
     pub id: String,
+    /// `dsc` aka `description`
     pub dsc: String,
 }
 impl Parsable for AssetDsc {
@@ -1574,7 +1569,7 @@ impl Parsable for AppLogJournalKind {
                         strip_whitespace(tag("WithdrawCash")),
                         UserCash::parser(),
                     ),
-                    |user_cash| AppLogJournalKind::DepositCash(user_cash),
+                    |user_cash| AppLogJournalKind::WithdrawCash(user_cash),
                 ),
                 map(
                     preceded(
@@ -2013,5 +2008,654 @@ mod test {
             ))
         );
         assert_eq!(LogKind::parser().parse(r#"App::Journal BuyAsset UserBucket{"user_id": "Steeve", "Bucket": Bucket{"asset_id":"bayc","count":1,},}"#), Ok(("", LogKind::App(AppLogKind::Journal(AppLogJournalKind::BuyAsset(UserBucket::new("Steeve".parse().unwrap(), Bucket::new("bayc".parse().unwrap(), 1))))))));
+    }
+
+    // ----- do_unquote / Unquote edge cases -----
+
+    #[test]
+    fn test_do_unquote_no_leading_quote() {
+        assert_eq!(
+            do_unquote("no quote here"),
+            Err(ParsingError::ParseQuotedString)
+        );
+    }
+
+    #[test]
+    fn test_do_unquote_unterminated() {
+        assert_eq!(do_unquote(r#""abc"#), Err(ParsingError::ParseQuotedString));
+        // escape encountered but string never closes
+        assert_eq!(
+            do_unquote(r#""abc\"#),
+            Err(ParsingError::ParseQuotedString)
+        );
+    }
+
+    #[test]
+    fn test_do_unquote_empty_body() {
+        assert_eq!(do_unquote(r#""""#), Ok(("", Cow::Borrowed(""))));
+    }
+
+    #[test]
+    fn test_do_unquote_fast_path_is_borrowed() {
+        // no escapes at all -> must be the zero-copy Cow::Borrowed path
+        let (remaining, s) = do_unquote(r#""hello world"tail"#).unwrap();
+        assert_eq!(remaining, "tail");
+        assert!(matches!(s, Cow::Borrowed("hello world")));
+    }
+
+    #[test]
+    fn test_do_unquote_slow_path_is_owned() {
+        // an escape forces the owned/allocating path
+        let (remaining, s) = do_unquote(r#""a\"b"tail"#).unwrap();
+        assert_eq!(remaining, "tail");
+        assert!(matches!(s, Cow::Owned(_)));
+        assert_eq!(s, "a\"b");
+    }
+
+    #[test]
+    fn test_do_unquote_escaped_backslash() {
+        assert_eq!(
+            do_unquote(r#""a\\b"rest"#),
+            Ok(("rest", Cow::Owned::<str>("a\\b".to_string())))
+        );
+    }
+
+    #[test]
+    fn test_do_unquote_leading_escape() {
+        // escape sequence right at the very start of the body
+        assert_eq!(
+            do_unquote(r#""\"quoted\""rest"#),
+            Ok(("rest", Cow::Owned::<str>("\"quoted\"".to_string())))
+        );
+    }
+
+    #[test]
+    fn test_unquote_error_paths() {
+        assert_eq!(
+            Unquote.parse("no quotes"),
+            Err(ParsingError::ParseQuotedString)
+        );
+        assert_eq!(
+            Unquote.parse(r#""unterminated"#),
+            Err(ParsingError::ParseQuotedString)
+        );
+        assert_eq!(Unquote.parse(""), Err(ParsingError::ParseQuotedString));
+    }
+
+    // ----- user_id / asset_identifier leaf parsers -----
+
+    #[test]
+    fn test_user_id_parser() {
+        assert_eq!(
+            user_id().parse(r#""Steeve"rest"#),
+            Ok(("rest", "Steeve".parse().unwrap()))
+        );
+        // empty user id string is rejected by UserId::from_str
+        assert_eq!(
+            user_id().parse(r#"""rest"#),
+            Err(ParsingError::ParseUserIdError)
+        );
+        assert_eq!(
+            user_id().parse("no quotes"),
+            Err(ParsingError::ParseQuotedString)
+        );
+    }
+
+    #[test]
+    fn test_asset_identifier_parser() {
+        assert_eq!(
+            asset_identifier().parse(r#""bayc"rest"#),
+            Ok(("rest", "bayc".parse().unwrap()))
+        );
+        assert_eq!(
+            asset_identifier().parse(r#"""rest"#),
+            Err(ParsingError::ParseUserIdError)
+        );
+    }
+
+    // ----- AsIs -----
+
+    #[test]
+    fn test_as_is() {
+        assert_eq!(AsIs.parse("everything"), Ok(("", "everything")));
+        assert_eq!(AsIs.parse(""), Ok(("", "")));
+    }
+
+    // ----- Tag / QuotedTag error paths -----
+
+    #[test]
+    fn test_tag_empty_input() {
+        assert_eq!(tag("key").parse(""), Err(ParsingError::ParseTagError));
+    }
+
+    #[test]
+    fn test_quoted_tag_error_paths() {
+        assert_eq!(
+            quoted_tag("key").parse(r#""other"=value"#),
+            Err(ParsingError::ParseTagError)
+        );
+        assert_eq!(
+            quoted_tag("key").parse(""),
+            Err(ParsingError::ParseQuotedString)
+        );
+        // trailing junk inside the quotes after the tag itself must fail
+        assert_eq!(
+            quoted_tag("key").parse(r#""keyextra"=value"#),
+            Err(ParsingError::ParseTagError)
+        );
+    }
+
+    // ----- StripWhitespace error propagation -----
+
+    #[test]
+    fn test_strip_whitespace_error_propagates() {
+        assert_eq!(
+            strip_whitespace(tag("hello")).parse("   goodbye"),
+            Err(ParsingError::ParseTagError)
+        );
+    }
+
+    // ----- Preceded -----
+
+    #[test]
+    fn test_preceded() {
+        assert_eq!(
+            preceded(tag("key="), NonZeroU32::MIN).parse("key=42rest"),
+            Ok(("rest", NonZeroU32::new(42).unwrap()))
+        );
+        assert_eq!(
+            preceded(tag("key="), NonZeroU32::MIN).parse("nope=42"),
+            Err(ParsingError::ParseTagError)
+        );
+        // prefix matches but the inner parser fails
+        assert_eq!(
+            preceded(tag("key="), NonZeroU32::MIN).parse("key=nope"),
+            Err(ParsingError::ParseIntError("".parse::<u32>().unwrap_err()))
+        );
+    }
+
+    // ----- All (3 and 4 args) -----
+
+    #[test]
+    fn test_all3() {
+        assert_eq!(
+            all3(tag("a"), NonZeroU32::MIN, tag("z")).parse("a42zrest"),
+            Ok(("rest", ((), NonZeroU32::new(42).unwrap(), ())))
+        );
+        assert!(
+            all3(tag("a"), NonZeroU32::MIN, tag("z"))
+                .parse("a42y")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_all4() {
+        assert_eq!(
+            all4(tag("a"), NonZeroU32::MIN, tag("z"), NonZeroU32::MIN)
+                .parse("a42z7rest"),
+            Ok((
+                "rest",
+                (
+                    (),
+                    NonZeroU32::new(42).unwrap(),
+                    (),
+                    NonZeroU32::new(7).unwrap()
+                )
+            ))
+        );
+    }
+
+    // ----- Permutation (3 args, all orderings) -----
+
+    #[test]
+    fn test_permutation3_all_orderings() {
+        let expected = (
+            NonZeroU32::new(1).unwrap(),
+            NonZeroU32::new(2).unwrap(),
+            NonZeroU32::new(3).unwrap(),
+        );
+        for input in [
+            r#""a":1,"b":2,"c":3,"#,
+            r#""a":1,"c":3,"b":2,"#,
+            r#""b":2,"a":1,"c":3,"#,
+            r#""b":2,"c":3,"a":1,"#,
+            r#""c":3,"a":1,"b":2,"#,
+            r#""c":3,"b":2,"a":1,"#,
+        ] {
+            assert_eq!(
+                permutation3(
+                    key_value("a", NonZeroU32::MIN),
+                    key_value("b", NonZeroU32::MIN),
+                    key_value("c", NonZeroU32::MIN),
+                )
+                .parse(input),
+                Ok(("", expected)),
+                "failed for input {input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_permutation3_missing_member_fails() {
+        assert!(
+            permutation3(
+                key_value("a", NonZeroU32::MIN),
+                key_value("b", NonZeroU32::MIN),
+                key_value("c", NonZeroU32::MIN),
+            )
+            .parse(r#""a":1,"b":2,"#)
+            .is_err()
+        );
+    }
+
+    // ----- List edge cases -----
+
+    #[test]
+    fn test_list_missing_open_bracket() {
+        assert_eq!(
+            list(NonZeroU32::MIN).parse("1,2,]"),
+            Err(ParsingError::ParseListError)
+        );
+    }
+
+    #[test]
+    fn test_list_missing_trailing_comma() {
+        assert_eq!(
+            list(NonZeroU32::MIN).parse("[1,2]"),
+            Err(ParsingError::ParseListError)
+        );
+    }
+
+    #[test]
+    fn test_list_unterminated() {
+        assert_eq!(
+            list(NonZeroU32::MIN).parse("[1,2,"),
+            Err(ParsingError::ParseListError)
+        );
+    }
+
+    #[test]
+    fn test_list_of_lists() {
+        assert_eq!(
+            list(list(NonZeroU32::MIN)).parse("[[1,2,],[3,],[],]"),
+            Ok((
+                "",
+                vec![
+                    vec![
+                        NonZeroU32::new(1).unwrap(),
+                        NonZeroU32::new(2).unwrap()
+                    ],
+                    vec![NonZeroU32::new(3).unwrap()],
+                    vec![],
+                ]
+            ))
+        );
+    }
+
+    // ----- Alt (3, 4, 8 args) -----
+
+    #[test]
+    fn test_alt3() {
+        let p = alt3(tag("a"), tag("b"), tag("c"));
+        assert_eq!(p.parse("arest"), Ok(("rest", ())));
+        assert_eq!(p.parse("brest"), Ok(("rest", ())));
+        assert_eq!(p.parse("crest"), Ok(("rest", ())));
+        assert_eq!(p.parse("drest"), Err(ParsingError::ParseTagError));
+    }
+
+    #[test]
+    fn test_alt4() {
+        let p = alt4(tag("a"), tag("b"), tag("c"), tag("d"));
+        assert_eq!(p.parse("drest"), Ok(("rest", ())));
+        assert_eq!(p.parse("erest"), Err(ParsingError::ParseTagError));
+    }
+
+    #[test]
+    fn test_alt8_picks_first_match_and_last_error() {
+        let p = alt8(
+            tag("a"),
+            tag("b"),
+            tag("c"),
+            tag("d"),
+            tag("e"),
+            tag("f"),
+            tag("g"),
+            tag("h"),
+        );
+        for (letter, rest) in [
+            ("a", "1"),
+            ("b", "1"),
+            ("c", "1"),
+            ("d", "1"),
+            ("e", "1"),
+            ("f", "1"),
+            ("g", "1"),
+            ("h", "1"),
+        ] {
+            assert_eq!(p.parse(&format!("{letter}{rest}")), Ok((rest, ())));
+        }
+        assert_eq!(p.parse("z1"), Err(ParsingError::ParseTagError));
+    }
+
+    // ----- Take -----
+
+    #[test]
+    fn test_take() {
+        assert_eq!(
+            take(3, stdp::Byte).parse("0a1b2crest"),
+            Ok(("rest", vec![0x0a, 0x1b, 0x2c]))
+        );
+        assert_eq!(take(0, stdp::Byte).parse("rest"), Ok(("rest", vec![])));
+        // not enough input for the requested count
+        assert!(take(3, stdp::Byte).parse("0a1b").is_err());
+    }
+
+    // ----- Status -----
+
+    #[test]
+    fn test_status() {
+        assert_eq!(Status::parser().parse("Ok"), Ok(("", Status::Ok)));
+        assert_eq!(Status::parser().parse("Okrest"), Ok(("rest", Status::Ok)));
+        match Status::parser().parse(r#"Err("oops")rest"#) {
+            Ok(("rest", Status::Err(msg))) => assert_eq!(msg, "oops"),
+            other => panic!("unexpected result: {other:?}"),
+        }
+        assert!(Status::parser().parse("Neither").is_err());
+    }
+
+    // ----- UserCash / UserBucket / UserBuckets / Announcements (direct) -----
+
+    #[test]
+    fn test_user_cash_parser_direct() {
+        assert_eq!(
+            UserCash::parser()
+                .parse(r#"UserCash{"user_id":"Steeve","count":10,}"#),
+            Ok((
+                "",
+                UserCash::new(
+                    "Steeve".parse().unwrap(),
+                    NonZeroU32::new(10).unwrap()
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn test_user_bucket_parser_direct() {
+        assert_eq!(
+            UserBucket::parser().parse(
+                r#"UserBucket{"user_id":"Steeve","Bucket":Bucket{"asset_id":"bayc","count":1,},}"#
+            ),
+            Ok((
+                "",
+                UserBucket::new(
+                    "Steeve".parse().unwrap(),
+                    Bucket::new("bayc".parse().unwrap(), 1)
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn test_user_buckets_parser() {
+        assert_eq!(
+            UserBuckets::parser().parse(
+                r#"UserBuckets{"user_id":"Steeve","buckets":[Bucket{"asset_id":"bayc","count":1,},Bucket{"asset_id":"usd","count":5,},],}"#
+            ),
+            Ok((
+                "",
+                UserBuckets::new(
+                    "Steeve".parse().unwrap(),
+                    vec![
+                        Bucket::new("bayc".parse().unwrap(), 1),
+                        Bucket::new("usd".parse().unwrap(), 5),
+                    ]
+                )
+            ))
+        );
+    }
+
+    #[test]
+    fn test_announcements_parser() {
+        let (remaining, announcements) = Announcements::parser()
+            .parse(
+                r#"[UserBuckets{"user_id":"Steeve","buckets":[Bucket{"asset_id":"bayc","count":1,},],},]"#
+            )
+            .unwrap();
+        assert_eq!(remaining, "");
+        assert_eq!(
+            announcements,
+            Announcements::new(vec![UserBuckets::new(
+                "Steeve".parse().unwrap(),
+                vec![Bucket::new("bayc".parse().unwrap(), 1)]
+            )])
+        );
+        assert_eq!(
+            Announcements::parser().parse("[]"),
+            Ok(("", Announcements::new(vec![])))
+        );
+    }
+
+    // ----- SystemLogTraceKind / AppLogErrorKind / AppLogTraceKind (remaining branches) -----
+
+    #[test]
+    fn test_system_log_trace_kind() {
+        assert_eq!(
+            SystemLogTraceKind::parser().parse(r#"Trace SendRequest "ping""#),
+            Ok(("", SystemLogTraceKind::SendRequest("ping".into())))
+        );
+        assert_eq!(
+            SystemLogTraceKind::parser().parse(r#"Trace GetResponse "pong""#),
+            Ok(("", SystemLogTraceKind::GetResponse("pong".into())))
+        );
+    }
+
+    #[test]
+    fn test_system_log_kind_trace_branch() {
+        assert_eq!(
+            LogKind::parser().parse(r#"System::Trace SendRequest "ping""#),
+            Ok((
+                "",
+                LogKind::System(SystemLogKind::Trace(
+                    SystemLogTraceKind::SendRequest("ping".into())
+                ))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_app_log_error_kind() {
+        assert_eq!(
+            AppLogErrorKind::parser().parse(r#"Error LackOf "gas""#),
+            Ok(("", AppLogErrorKind::LackOf("gas".into())))
+        );
+        assert_eq!(
+            AppLogErrorKind::parser().parse(r#"Error SystemError "disk full""#),
+            Ok(("", AppLogErrorKind::SystemError("disk full".into())))
+        );
+    }
+
+    #[test]
+    fn test_app_log_kind_error_branch() {
+        assert_eq!(
+            LogKind::parser().parse(r#"App::Error LackOf "gas""#),
+            Ok((
+                "",
+                LogKind::App(AppLogKind::Error(AppLogErrorKind::LackOf(
+                    "gas".into()
+                )))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_app_log_trace_kind_get_response() {
+        assert_eq!(
+            AppLogTraceKind::parser().parse(r#"Trace GetResponse "ok""#),
+            Ok(("", AppLogTraceKind::GetResponse("ok".into())))
+        );
+    }
+
+    #[test]
+    fn test_app_log_trace_kind_check_announcements() {
+        let (remaining, trace) = AppLogTraceKind::parser()
+            .parse(
+                r#"Trace Check [UserBuckets{"user_id":"Steeve","buckets":[Bucket{"asset_id":"bayc","count":1,},],},]"#
+            )
+            .unwrap();
+        assert_eq!(remaining, "");
+        match trace {
+            AppLogTraceKind::Check(_) => {}
+            other => panic!("expected Check variant, got {other:?}"),
+        }
+    }
+
+    // ----- AppLogJournalKind: remaining variants -----
+
+    #[test]
+    fn test_journal_register_asset() {
+        assert_eq!(
+            AppLogJournalKind::parser().parse(
+                r#"Journal RegisterAsset {"asset_id":"bayc","user_id":"Steeve","liquidity":100,}"#
+            ),
+            Ok((
+                "",
+                AppLogJournalKind::RegisterAsset {
+                    asset_id: "bayc".parse().unwrap(),
+                    user_id: "Steeve".parse().unwrap(),
+                    liquidity: NonZeroU32::new(100).unwrap(),
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_journal_unregister_asset() {
+        assert_eq!(
+            AppLogJournalKind::parser().parse(
+                r#"Journal UnregisterAsset {"asset_id":"bayc","user_id":"Steeve",}"#
+            ),
+            Ok((
+                "",
+                AppLogJournalKind::UnregisterAsset {
+                    asset_id: "bayc".parse().unwrap(),
+                    user_id: "Steeve".parse().unwrap(),
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_journal_withdraw_cash() {
+        // regression test: this used to be mismapped to DepositCash
+        assert_eq!(
+            AppLogJournalKind::parser().parse(
+                r#"Journal WithdrawCash UserCash{"user_id":"Steeve","count":10,}"#
+            ),
+            Ok((
+                "",
+                AppLogJournalKind::WithdrawCash(UserCash::new(
+                    "Steeve".parse().unwrap(),
+                    NonZeroU32::new(10).unwrap()
+                ))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_journal_deposit_cash_not_mixed_up_with_withdraw() {
+        assert_eq!(
+            AppLogJournalKind::parser().parse(
+                r#"Journal DepositCash UserCash{"user_id":"Steeve","count":10,}"#
+            ),
+            Ok((
+                "",
+                AppLogJournalKind::DepositCash(UserCash::new(
+                    "Steeve".parse().unwrap(),
+                    NonZeroU32::new(10).unwrap()
+                ))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_journal_sell_asset() {
+        assert_eq!(
+            AppLogJournalKind::parser().parse(
+                r#"Journal SellAsset UserBucket{"user_id":"Steeve","Bucket":Bucket{"asset_id":"bayc","count":1,},}"#
+            ),
+            Ok((
+                "",
+                AppLogJournalKind::SellAsset(UserBucket::new(
+                    "Steeve".parse().unwrap(),
+                    Bucket::new("bayc".parse().unwrap(), 1)
+                ))
+            ))
+        );
+    }
+
+    // ----- LogLine / LOG_LINE_PARSER: full end-to-end lines -----
+
+    #[test]
+    fn test_log_line_full_parse() {
+        let (remaining, line) = LogLine::parser()
+            .parse(r#"System::Error NetworkError "url unknown" requestid=42"#)
+            .unwrap();
+        assert_eq!(remaining, "");
+        assert_eq!(line.request_id(), 42);
+        assert!(line.is_error());
+        assert!(!line.is_exchange());
+    }
+
+    #[test]
+    fn test_log_line_parser_static() {
+        let (remaining, line) = LOG_LINE_PARSER
+            .parse(
+                r#"App::Journal DeleteUser {"user_id": "Steeve",} requestid=7"#,
+            )
+            .unwrap();
+        assert_eq!(remaining, "");
+        assert_eq!(line.request_id(), 7);
+        assert!(!line.is_exchange());
+    }
+
+    #[test]
+    fn test_log_line_is_exchange_flags() {
+        let (_, line) = LOG_LINE_PARSER
+            .parse(r#"App::Journal BuyAsset UserBucket{"user_id": "Steeve", "Bucket": Bucket{"asset_id":"bayc","count":1,},} requestid=1"#)
+            .unwrap();
+        assert!(line.is_exchange());
+        assert!(!line.is_error());
+    }
+
+    #[test]
+    fn test_log_line_missing_request_id_fails() {
+        assert!(
+            LOG_LINE_PARSER
+                .parse(r#"System::Error NetworkError "url unknown""#)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_log_line_trailing_garbage_is_reported_as_remaining() {
+        // the parser itself doesn't require full consumption - callers
+        // (like LogIterator) are responsible for checking `remaining`.
+        // note: the trailing StripWhitespace around the request-id parser
+        // also eats the leading space of whatever comes after it.
+        let (remaining, _) = LOG_LINE_PARSER
+            .parse(r#"App::Journal DeleteUser {"user_id": "Steeve",} requestid=7 trailing junk"#)
+            .unwrap();
+        assert_eq!(remaining, "trailing junk");
+    }
+
+    // ----- stdp::Byte error paths -----
+
+    #[test]
+    fn test_byte_parser_errors() {
+        assert_eq!(stdp::Byte.parse("a"), Err(ParsingError::SplitStringError));
+        assert!(stdp::Byte.parse("zz").is_err());
+        assert_eq!(stdp::Byte.parse("ff"), Ok(("", 0xff)));
     }
 }

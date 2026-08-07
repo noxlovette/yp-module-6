@@ -168,7 +168,7 @@ System::Trace SendRequest "Jupiter->GetAnnouncements" requestid=10
 App::Trace SendRequest "GetAnnouncements" requestid=10
 System::Trace GetResponse "HTTP 200 [UserBuckets{\"user_id\":\"Bob\",\"Buckets\":[Bucket{\"asset_id\":\"milk\",\"count\":3,},],},]" requestid=10
 App::Trace GetResponse "Ok" requestid=10
-App::Trace Check [UserBuckets{"user_id":"Bob","Buckets":[Bucket{"asset_id":"milk","count":3,},],},] requestid=10
+App::Trace Check [UserBuckets{"user_id":"Bob","buckets":[Bucket{"asset_id":"milk","count":3,},],},] requestid=10
 System::Trace SendRequest "Jupiter->buyasset{\"user_id\":\"alice\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
 App::Trace SendRequest "{\"user_id\":\"Alice\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
 System::Trace GetResponse "HTTP 200" requestid=10
@@ -177,7 +177,84 @@ App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"m
         "#;
 
     #[test]
+    fn test_single_line() {
+        let lines = read_log(SOURCE1.as_bytes(), ReadMode::All, vec![1]).unwrap();
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].request_id(), 1);
+        assert!(lines[0].is_error());
+        assert!(!lines[0].is_exchange());
+    }
+
+    #[test]
     fn test_all() {
-        todo!();
+        let all_ids: Vec<u32> = (1..=10).collect();
+
+        // ReadMode::All with every request id present - every non-blank
+        // line in SOURCE should parse cleanly
+        let lines =
+            read_log(SOURCE.as_bytes(), ReadMode::All, all_ids.clone()).unwrap();
+        assert_eq!(lines.len(), 54);
+        let expected_counts_by_request_id: [(u32, usize); 10] = [
+            (1, 2),
+            (2, 4),
+            (3, 8),
+            (4, 8),
+            (5, 5),
+            (6, 5),
+            (7, 2),
+            (8, 6),
+            (9, 4),
+            (10, 10),
+        ];
+        for (id, count) in expected_counts_by_request_id {
+            assert_eq!(
+                lines.iter().filter(|l| l.request_id() == id).count(),
+                count,
+                "wrong count for request_id={id}"
+            );
+        }
+
+        // ReadMode::Errors returns only lines flagged as errors
+        let errors =
+            read_log(SOURCE.as_bytes(), ReadMode::Errors, all_ids.clone())
+                .unwrap();
+        assert!(errors.iter().all(|l| l.is_error()));
+        assert_eq!(
+            errors.iter().map(|l| l.request_id()).collect::<Vec<_>>(),
+            vec![1, 1, 2, 2, 7, 7, 8]
+        );
+
+        // ReadMode::Exchanges returns only lines flagged as exchanges
+        let exchanges =
+            read_log(SOURCE.as_bytes(), ReadMode::Exchanges, all_ids.clone())
+                .unwrap();
+        assert!(exchanges.iter().all(|l| l.is_exchange()));
+        assert_eq!(
+            exchanges.iter().map(|l| l.request_id()).collect::<Vec<_>>(),
+            vec![3, 4, 5, 6, 9, 10]
+        );
+
+        // request_ids filter narrows down to only the matching lines
+        let only9 = read_log(SOURCE.as_bytes(), ReadMode::All, vec![9]).unwrap();
+        assert_eq!(only9.len(), 4);
+        assert!(only9.iter().all(|l| l.request_id() == 9));
+
+        // a request id absent from the log yields no lines, not an error
+        let none =
+            read_log(SOURCE.as_bytes(), ReadMode::All, vec![999]).unwrap();
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn test_read_log_fails_fast_on_malformed_line() {
+        let mut source = SOURCE1.to_string();
+        source.push_str("\nthis is not a valid log line\n");
+        assert!(read_log(source.as_bytes(), ReadMode::All, vec![1]).is_err());
+    }
+
+    #[test]
+    fn test_read_log_fails_on_trailing_input() {
+        let source = format!("{SOURCE1} unexpected trailing content");
+        assert!(read_log(source.as_bytes(), ReadMode::All, vec![1]).is_err());
     }
 }

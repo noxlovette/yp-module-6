@@ -12,4 +12,5 @@ name = "cli"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.104"
 thiserror = "2.0.19"
