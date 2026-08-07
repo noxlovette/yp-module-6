@@ -13,7 +13,8 @@ pub const READ_MODE_EXCHANGES: u8 = 2;
 #[derive(Debug)]
 struct RefMutWrapper<'a, T>(std::cell::RefMut<'a, T>);
 impl<'a, T> std::io::Read for RefMutWrapper<'a, T>
-where T: std::io::Read
+where
+    T: std::io::Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.0.read(buf)
@@ -23,15 +24,16 @@ where T: std::io::Read
 /// Для `Box<dyn много трейтов, помимо auto-трейтов>`, (`rustc E0225`)
 /// `only auto traits can be used as additional traits in a trait object`
 /// `consider creating a new trait with all of these as supertraits and using that trait here instead`
-pub trait MyReader: std::io::Read + std::fmt::Debug + 'static
-{}
-impl<T: std::io::Read + std::fmt::Debug + 'static> MyReader for T
-{}
+pub trait MyReader: std::io::Read + std::fmt::Debug + 'static {}
+impl<T: std::io::Read + std::fmt::Debug + 'static> MyReader for T {}
 // подсказка: вместо trait-объекта можно дженерик
 /// Итератор, на выходе которого - строки распарсенной структуры данных
 #[derive(Debug)]
 struct LogIterator {
-    lines: std::iter::Filter<std::io::Lines<std::io::BufReader<RefMutWrapper<'static, Box<dyn MyReader>>>>,fn(&Result<String,std::io::Error>)->bool>,
+    lines: std::iter::Filter<
+        std::io::Lines<std::io::BufReader<RefMutWrapper<'static, Box<dyn MyReader>>>>,
+        fn(&Result<String, std::io::Error>) -> bool,
+    >,
     reader_rc: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>>,
 }
 impl LogIterator {
@@ -45,16 +47,17 @@ impl LogIterator {
         // > порядке объявления в структуре - то есть сначала будет удалён
         // > мой RefMutWrapper, а уже потом и весь исходный reader_rc
         let the_borrow = r.borrow_mut();
-        let the_borrow = unsafe{std::mem::transmute::<_,_>(the_borrow)};
-        Self{
+        let the_borrow = unsafe { std::mem::transmute::<_, _>(the_borrow) };
+        Self {
             lines: std::io::BufReader::with_capacity(4096, RefMutWrapper(the_borrow))
-                       .lines()
-                       .filter(
-                           |line_res|
-                           !line_res.as_ref().ok()
-                               .map(|line| line.trim().is_empty())
-                               .unwrap_or(false)
-                        ),
+                .lines()
+                .filter(|line_res| {
+                    !line_res
+                        .as_ref()
+                        .ok()
+                        .map(|line| line.trim().is_empty())
+                        .unwrap_or(false)
+                }),
             reader_rc: r,
         }
     }
@@ -70,7 +73,11 @@ impl Iterator for LogIterator {
 
 // подсказка: RefCell вообще не нужен
 /// Принимает поток байт, отдаёт отфильтрованные и распарсенные логи
-pub fn read_log(input: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>>, mode: u8, request_ids: Vec<u32>) -> Vec<LogLine> {
+pub fn read_log(
+    input: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>>,
+    mode: u8,
+    request_ids: Vec<u32>,
+) -> Vec<LogLine> {
     let logs = LogIterator::new(input);
     let mut collected = Vec::new();
     // подсказка: можно обойтись итераторами
@@ -120,7 +127,6 @@ pub fn read_log(input: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>>, mode:
     }
     collected
 }
-
 
 #[cfg(test)]
 mod test {
@@ -176,33 +182,36 @@ App::Trace Check [] requestid=8
 App::Error LackOf "can't buy milk, no sellers" requestid=8
 
 System::Trace SendRequest "Jupiter->SellAsset" requestid=9
-App::Trace SendRequest "SellAsset UserBacket{\"user_id\":\"Bob\",\"backet\":Backet{\"asset_id\":\"milk\",\"count\":3,},}" requestid=9
+App::Trace SendRequest "SellAsset UserBucket{\"user_id\":\"Bob\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":3,},}" requestid=9
 System::Trace GetResponse "HTTP 200" requestid=9
-App::Journal SellAsset UserBacket{"user_id":"Bob","backet":Backet{"asset_id":"milk","count":3,},} requestid=9
+App::Journal SellAsset UserBucket{"user_id":"Bob","Bucket":Bucket{"asset_id":"milk","count":3,},} requestid=9
 
 System::Trace SendRequest "Jupiter->GetAnnouncements" requestid=10
 App::Trace SendRequest "GetAnnouncements" requestid=10
-System::Trace GetResponse "HTTP 200 [UserBackets{\"user_id\":\"Bob\",\"backets\":[Backet{\"asset_id\":\"milk\",\"count\":3,},],},]" requestid=10
+System::Trace GetResponse "HTTP 200 [UserBuckets{\"user_id\":\"Bob\",\"Buckets\":[Bucket{\"asset_id\":\"milk\",\"count\":3,},],},]" requestid=10
 App::Trace GetResponse "Ok" requestid=10
-App::Trace Check [UserBackets{"user_id":"Bob","backets":[Backet{"asset_id":"milk","count":3,},],},] requestid=10
-System::Trace SendRequest "Jupiter->buyasset{\"user_id\":\"alice\",\"backet\":backet{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
-App::Trace SendRequest "{\"user_id\":\"Alice\",\"backet\":Backet{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
+App::Trace Check [UserBuckets{"user_id":"Bob","Buckets":[Bucket{"asset_id":"milk","count":3,},],},] requestid=10
+System::Trace SendRequest "Jupiter->buyasset{\"user_id\":\"alice\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
+App::Trace SendRequest "{\"user_id\":\"Alice\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
 System::Trace GetResponse "HTTP 200" requestid=10
 App::Trace GetResponse "Ok" requestid=10
-App::Journal BuyAsset UserBacket{"user_id":"Alice","backet":Backet{"asset_id":"milk","count":5,},} requestid=10
+App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"milk","count":5,},} requestid=10
         "#;
-
 
     #[test]
     fn test_all() {
-        let refcell1: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>> = std::rc::Rc::new(std::cell::RefCell::new(Box::new(SOURCE1.as_bytes())));
+        let refcell1: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>> =
+            std::rc::Rc::new(std::cell::RefCell::new(Box::new(SOURCE1.as_bytes())));
         assert_eq!(read_log(refcell1.clone(), READ_MODE_ALL, vec![]).len(), 1);
-        let refcell: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>> = std::rc::Rc::new(std::cell::RefCell::new(Box::new(SOURCE.as_bytes())));
+        let refcell: std::rc::Rc<std::cell::RefCell<Box<dyn MyReader>>> =
+            std::rc::Rc::new(std::cell::RefCell::new(Box::new(SOURCE.as_bytes())));
         let all_parsed = read_log(refcell.clone(), READ_MODE_ALL, vec![]);
         println!("all parsed:");
-        all_parsed.iter().for_each(|parsed| println!("  {:?}", parsed));
+        all_parsed
+            .iter()
+            .for_each(|parsed| println!("  {:?}", parsed));
         // 2 для начала и конца строки (чтобы первая и последняя кавычки на отдельных строках были)
         // второе число - число пустых строк, которые оставлены для удобства чтения
-        assert_eq!(all_parsed.len(), SOURCE.lines().count()-2-7);
+        assert_eq!(all_parsed.len(), SOURCE.lines().count() - 2 - 7);
     }
 }

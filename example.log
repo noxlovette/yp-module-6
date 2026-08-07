@@ -45,17 +45,17 @@ App::Trace Check [] requestid=8
 App::Error LackOf "can't buy milk, no sellers" requestid=8
 
 System::Trace SendRequest "Jupiter->SellAsset" requestid=9
-App::Trace SendRequest "SellAsset UserBacket{\"user_id\":\"Bob\",\"backet\":Backet{\"asset_id\":\"milk\",\"count\":3,},}" requestid=9
+App::Trace SendRequest "SellAsset UserBucket{\"user_id\":\"Bob\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":3,},}" requestid=9
 System::Trace GetResponse "HTTP 200" requestid=9
-App::Journal SellAsset UserBacket{"user_id":"Bob","backet":Backet{"asset_id":"milk","count":3,},} requestid=9
+App::Journal SellAsset UserBucket{"user_id":"Bob","Bucket":Bucket{"asset_id":"milk","count":3,},} requestid=9
 
 System::Trace SendRequest "Jupiter->GetAnnouncements" requestid=10
 App::Trace SendRequest "GetAnnouncements" requestid=10
-System::Trace GetResponse "HTTP 200 [UserBackets{\"user_id\":\"Bob\",\"backets\":[Backet{\"asset_id\":\"milk\",\"count\":3,},],},]" requestid=10
+System::Trace GetResponse "HTTP 200 [UserBuckets{\"user_id\":\"Bob\",\"Buckets\":[Bucket{\"asset_id\":\"milk\",\"count\":3,},],},]" requestid=10
 App::Trace GetResponse "Ok" requestid=10
-App::Trace Check [UserBackets{"user_id":"Bob","backets":[Backet{"asset_id":"milk","count":3,},],},] requestid=10
-System::Trace SendRequest "Jupiter->buyasset{\"user_id\":\"alice\",\"backet\":backet{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
-App::Trace SendRequest "{\"user_id\":\"Alice\",\"backet\":Backet{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
+App::Trace Check [UserBuckets{"user_id":"Bob","Buckets":[Bucket{"asset_id":"milk","count":3,},],},] requestid=10
+System::Trace SendRequest "Jupiter->buyasset{\"user_id\":\"alice\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
+App::Trace SendRequest "{\"user_id\":\"Alice\",\"Bucket\":Bucket{\"asset_id\":\"milk\",\"count\":5,},}" requestid=10
 System::Trace GetResponse "HTTP 200" requestid=10
 App::Trace GetResponse "Ok" requestid=10
-App::Journal BuyAsset UserBacket{"user_id":"Alice","backet":Backet{"asset_id":"milk","count":5,},} requestid=10
+App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"milk","count":5,},} requestid=10
