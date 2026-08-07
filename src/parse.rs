@@ -2437,7 +2437,8 @@ mod test {
         );
     }
 
-    // ----- SystemLogTraceKind / AppLogErrorKind / AppLogTraceKind (remaining branches) -----
+    // ----- SystemLogTraceKind / AppLogErrorKind / AppLogTraceKind (remaining
+    // branches) -----
 
     #[test]
     fn test_system_log_trace_kind() {

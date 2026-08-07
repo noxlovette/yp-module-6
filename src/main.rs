@@ -14,7 +14,7 @@
 //  -- по ошибкам
 //  -- по изменению счёта (купить/продать)
 
-use std::{fs::File, io::BufReader, path::Path};
+use std::{fs::File, io::BufReader};
 
 // Модель данных:
 // - Пользователь (userid, имя)
@@ -53,12 +53,14 @@ use std::{fs::File, io::BufReader, path::Path};
 fn main() -> anyhow::Result<()> {
     println!("Placeholder для экспериментов с cli");
 
-    let parsing_demo = r#"[UserBuckets{"user_id":"Bob","Buckets":[Bucket{"asset_id":"milk","count":3,},],},]"#;
-    let announcements = analysis::parse::just_parse(parsing_demo)?;
+    let parsing_demo = r#"[UserBuckets{"user_id":"Bob","buckets":[Bucket{"asset_id":"milk","count":3,},],},]"#;
+    let announcements = analysis::parse::just_parse::<
+        analysis::domain::Announcements,
+    >(parsing_demo)?;
     println!("demo-parsed: {:?}", announcements);
 
     let args = std::env::args().collect::<Vec<_>>();
-    let path = args[1];
+    let path = &args[1];
 
     println!(
         "Trying to open file '{}' from directory '{}'",

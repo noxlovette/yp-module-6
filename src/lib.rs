@@ -178,7 +178,8 @@ App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"m
 
     #[test]
     fn test_single_line() {
-        let lines = read_log(SOURCE1.as_bytes(), ReadMode::All, vec![1]).unwrap();
+        let lines =
+            read_log(SOURCE1.as_bytes(), ReadMode::All, vec![1]).unwrap();
         assert_eq!(lines.len(), 1);
         assert_eq!(lines[0].request_id(), 1);
         assert!(lines[0].is_error());
@@ -191,8 +192,8 @@ App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"m
 
         // ReadMode::All with every request id present - every non-blank
         // line in SOURCE should parse cleanly
-        let lines =
-            read_log(SOURCE.as_bytes(), ReadMode::All, all_ids.clone()).unwrap();
+        let lines = read_log(SOURCE.as_bytes(), ReadMode::All, all_ids.clone())
+            .unwrap();
         assert_eq!(lines.len(), 54);
         let expected_counts_by_request_id: [(u32, usize); 10] = [
             (1, 2),
@@ -235,7 +236,8 @@ App::Journal BuyAsset UserBucket{"user_id":"Alice","Bucket":Bucket{"asset_id":"m
         );
 
         // request_ids filter narrows down to only the matching lines
-        let only9 = read_log(SOURCE.as_bytes(), ReadMode::All, vec![9]).unwrap();
+        let only9 =
+            read_log(SOURCE.as_bytes(), ReadMode::All, vec![9]).unwrap();
         assert_eq!(only9.len(), 4);
         assert!(only9.iter().all(|l| l.request_id() == 9));
 
