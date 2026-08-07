@@ -944,7 +944,7 @@ impl Parsable for UserCash {
                 ),
                 strip_whitespace(tag("}")),
             ),
-            |(user_id, count)| UserCash { user_id, count },
+            |(user_id, count)| UserCash::new(user_id, count),
         )
     }
 }
@@ -1023,34 +1023,14 @@ impl Parsable for Announcements {
     }
 }
 
-// просто обёртки
-// подсказка: почему бы не заменить на один дженерик?
-/// Обёртка для парсинга [AssetDsc]
-pub fn just_parse_asset_dsc(input: String) -> Result<(String, AssetDsc), ()> {
-    <AssetDsc as Parsable>::parser().parse(input)
+/// One generic parsing function
+pub fn just_parse<T>(input: impl Into<String>) -> Result<(String, T), ()>
+where
+    T: Parsable,
+{
+    T::parser().parse(input.into())
 }
-/// Обёртка для парсинга [Bucket]
-pub fn just_parse_bucket(input: String) -> Result<(String, Bucket), ()> {
-    <Bucket as Parsable>::parser().parse(input)
-}
-/// Обёртка для парсинга [UserCash]
-pub fn just_user_cash(input: String) -> Result<(String, UserCash), ()> {
-    <UserCash as Parsable>::parser().parse(input)
-}
-/// Обёртка для парсинга [UserBucket]
-pub fn just_user_bucket(input: String) -> Result<(String, UserBucket), ()> {
-    <UserBucket as Parsable>::parser().parse(input)
-}
-/// Обёртка для парсинга [UserBuckets]
-pub fn just_user_buckets(input: String) -> Result<(String, UserBuckets), ()> {
-    <UserBuckets as Parsable>::parser().parse(input)
-}
-/// Обёртка для парсинга [Announcements]
-pub fn just_parse_anouncements(
-    input: String,
-) -> Result<(String, Announcements), ()> {
-    <Announcements as Parsable>::parser().parse(input)
-}
+
 impl Parsable for SystemLogErrorKind {
     type Parser = Preceded<
         Tag,

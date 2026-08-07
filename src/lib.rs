@@ -6,12 +6,10 @@ pub mod domain;
 mod error;
 pub mod log;
 pub mod parse;
-
+use crate::log::LogLine;
 pub use error::Error;
 use parse::*;
 use std::io::Read;
-
-use crate::log::LogLine;
 
 /// Режим чтения
 pub enum ReadMode {
@@ -22,26 +20,6 @@ pub enum ReadMode {
     /// Режим чтения из логов только операций, касающихся деген
     Exchanges,
 }
-
-/// Обёртка, без которой не выполнено требование `std::io::BufReader<T:
-/// std::io::Read>`
-#[derive(Debug)]
-struct RefMutWrapper<'a, T>(std::cell::RefMut<'a, T>);
-impl<'a, T> std::io::Read for RefMutWrapper<'a, T>
-where
-    T: std::io::Read,
-{
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.0.read(buf)
-    }
-}
-
-/// Для `Box<dyn много трейтов, помимо auto-трейтов>`, (`rustc E0225`)
-/// `only auto traits can be used as additional traits in a trait object`
-/// `consider creating a new trait with all of these as supertraits and using
-/// that trait here instead`
-pub trait MyReader: std::io::Read + std::fmt::Debug + 'static {}
-impl<T: std::io::Read + std::fmt::Debug + 'static> MyReader for T {}
 
 /// Итератор, на выходе которого - строки распарсенной структуры данных
 #[derive(Debug)]

@@ -62,25 +62,52 @@ pub struct Bucket {
     asset_id: AssetIdentifier,
     count: u32,
 }
+impl Bucket {
+    pub fn new(asset_id: AssetIdentifier, count: u32) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            count,
+        }
+    }
+}
 
 /// [Bucket] конкретного пользователя
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBucket {
-    pub user_id: UserId,
-    pub bucket: Bucket,
+    user_id: UserId,
+    bucket: Bucket,
+}
+
+impl UserBucket {
+    pub fn new(uid: UserId, b: Bucket) -> Self {
+        Self {
+            user_id: uid,
+            bucket: b,
+        }
+    }
+}
+
+impl UserBuckets {
+    pub fn new(uid: UserId, bs: Vec<Bucket>) -> Self {
+        Self {
+            user_id: uid,
+            buckets: bs,
+        }
+    }
 }
 
 /// [Бакеты](Bucket) конкретного пользователя
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBuckets {
-    pub user_id: String,
-    pub buckets: Vec<Bucket>,
+    user_id: UserId,
+    buckets: Vec<Bucket>,
 }
+
 /// Фиатные деньги конкретного пользователя
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserCash {
-    pub user_id: String,
-    pub count: u32,
+    user_id: UserId,
+    count: u32,
 }
 
 pub const AUTHDATA_SIZE: usize = 1024;
@@ -95,14 +122,6 @@ impl AuthData {
     }
 }
 
-impl Bucket {
-    pub fn new(asset_id: AssetIdentifier, count: u32) -> Self {
-        Self {
-            asset_id: asset_id.into(),
-            count,
-        }
-    }
-}
 /// Список опубликованных бакетов
 #[derive(Debug, Clone, PartialEq)]
 pub struct Announcements(Vec<UserBuckets>);
